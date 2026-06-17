@@ -7,6 +7,7 @@ import bg from "../assets/Sprites/BG/floor/tiledfloor.png";
 import farm from "../assets/Sprites/BG/farm/carrot.png";
 import decor1 from "../assets/Sprites/BG/stons/bgdesign-animation 1-000.png";
 import decor2 from "../assets/Sprites/BG/stons/bgdesign-animation 1-001.png";
+import floorPatch from "../assets/Sprites/BG/floor/popfade.png";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -22,6 +23,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("carrot", farm);
     this.load.image("decor1", decor1);
     this.load.image("decor2", decor2);
+    this.load.image("floorPatch", floorPatch);
   }
   create() {
     this.playerHP = 100;
@@ -48,7 +50,30 @@ export default class GameScene extends Phaser.Scene {
       { x: 1880, y: 500, key: "decor1" },
       { x: 1850, y: 950, key: "decor2" },
     ];
+    this.gridContainer = this.add.container();
 
+    const CELL_WIDTH = 128;
+    const CELL_HEIGHT = 128;
+
+    for (let row = 0; row < 7; row++) {
+      const startCol = row % 2;
+
+      for (let col = startCol; col < 10; col += 2) {
+        const tile = this.add.image(
+          col * CELL_WIDTH,
+          row * CELL_HEIGHT,
+          "floorPatch",
+        );
+
+        tile.setAlpha(0.05);
+
+        this.gridContainer.add(tile);
+      }
+    }
+
+    this.gridContainer.setPosition(470, 250);
+
+    this.gridContainer.setDepth(-90);
     decorPositions.forEach((pos) => {
       const d = this.add.image(pos.x, pos.y, pos.key);
 
