@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import Player from "../entities/Player";
+// import Player from "../entities/Player";
 import Enemy from "../entities/Enemy";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
@@ -90,7 +90,7 @@ export default class GameScene extends Phaser.Scene {
       d.setScale(0.8);
     });
     // this.add.rectangle(960, 540, 1920, 1080).setStrokeStyle(10, 0xff0000);
-    this.player = new Player(this, 150, 360);
+    // this.player = new Player(this, 150, 360);
     this.anims.create({
       key: "worm-run",
       frames: this.anims.generateFrameNumbers("worm", { start: 0, end: 12 }),
@@ -107,15 +107,15 @@ export default class GameScene extends Phaser.Scene {
       },
     });
     // Top electrode
-    this.add.image(350, 220, "topElectrode").setScale(1).setDepth(10);
+    this.add.image(350, 220, "topElectrode").setScale(0.8).setDepth(10);
 
     // Bottom electrode
-    this.add.image(350, 950, "bottomElectrode").setScale(1).setDepth(10);
+    this.add.image(350, 950, "bottomElectrode").setScale(0.8).setDepth(10);
 
     // Top electrode wire
-    this.add.image(105, 240, "topElectrodeWire").setScale(1).setDepth(9);
+    this.add.image(145, 240, "topElectrodeWire").setScale(0.8).setDepth(9);
 
     // Bottom electrode wire
-    this.add.image(105, 1020, "bottomElectrodeWire").setScale(1).setDepth(9);
+    this.add.image(145, 1020, "bottomElectrodeWire").setScale(0.8).setDepth(9);
   }
 }

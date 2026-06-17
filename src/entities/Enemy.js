@@ -11,7 +11,7 @@ export default class Enemy {
     this.shadow.setDepth(0);
     this.sprite.setDepth(1);
 
-    this.sprite.setScale(0.7);
+    this.sprite.setScale(0.8);
 
     this.isMoving = false;
   }
