@@ -8,6 +8,10 @@ import farm from "../assets/Sprites/BG/farm/carrot.png";
 import decor1 from "../assets/Sprites/BG/stons/bgdesign-animation 1-000.png";
 import decor2 from "../assets/Sprites/BG/stons/bgdesign-animation 1-001.png";
 import floorPatch from "../assets/Sprites/BG/floor/popfade.png";
+import top_electrode from "../assets/Sprites/BG/electrode/electrode-a0-001.png";
+import bottom_electrode from "../assets/Sprites/BG/electrode/electrode-a0-000.png";
+import top_electrode_wire from "../assets/Sprites/BG/electrode/electrocable-animation 1-000.png";
+import bottom_electrode_wire from "../assets/Sprites/BG/electrode/electrocable-animation 1-001.png";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -24,6 +28,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("decor1", decor1);
     this.load.image("decor2", decor2);
     this.load.image("floorPatch", floorPatch);
+    this.load.image("topElectrode", top_electrode);
+    this.load.image("bottomElectrode", bottom_electrode);
+    this.load.image("topElectrodeWire", top_electrode_wire);
+    this.load.image("bottomElectrodeWire", bottom_electrode_wire);
   }
   create() {
     this.playerHP = 100;
@@ -98,5 +106,16 @@ export default class GameScene extends Phaser.Scene {
         this.enemy.moveOneBeat();
       },
     });
+    // Top electrode
+    this.add.image(350, 220, "topElectrode").setScale(1).setDepth(10);
+
+    // Bottom electrode
+    this.add.image(350, 950, "bottomElectrode").setScale(1).setDepth(10);
+
+    // Top electrode wire
+    this.add.image(105, 240, "topElectrodeWire").setScale(1).setDepth(9);
+
+    // Bottom electrode wire
+    this.add.image(105, 1020, "bottomElectrodeWire").setScale(1).setDepth(9);
   }
 }
