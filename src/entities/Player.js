@@ -14,8 +14,8 @@ export default class Player {
 
     // Configurable offsets for head and gun relative to the sprite center
     // Adjust these offsets to line up the parts with the main body sprite
-    this.headOffset = { x: -10, y: -105 };
-    this.gunOffset = { x: 18, y: -8 };
+    this.headOffset = { x: -10, y: -110 };
+    this.gunOffset = { x: 25, y: -16 };
 
     // --- OOP Structural Framework for Future Additions ---
     this.health = 100;
