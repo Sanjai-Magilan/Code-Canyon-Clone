@@ -44,10 +44,7 @@ export default class GameScene extends Phaser.Scene {
     this.bg = this.add.tileSprite(2500, 2500, 5000, 5000, "bg");
 
     this.bg.setDepth(-100);
-    const border = this.add.graphics();
 
-    border.lineStyle(20, 0xff0000);
-    border.strokeRect(0, 0, 5000, 5000);
     this.player = new Player(this, 800, 600);
 
     this.cameras.main.startFollow(this.player.getSprite());
