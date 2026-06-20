@@ -12,31 +12,39 @@ export default class Player {
     // --- Configurable Properties ---
     this.speed = 600; // Movement speed in pixels per second
 
+    // Configurable offsets for head and gun relative to the sprite center
+    // Adjust these offsets to line up the parts with the main body sprite
+    this.headOffset = { x: -10, y: -105 };
+    this.gunOffset = { x: 18, y: -8 };
+
     // --- OOP Structural Framework for Future Additions ---
     this.health = 100;
     this.maxHealth = 100;
     this.weapons = [];
     this.inventory = [];
     this.interactionSystem = {
-      // Future interaction system logic can reside here
       interact: () => {
         console.log("Interacting with nearby object...");
-      },
+      }
     };
 
     // --- Sprite & Physics Creation ---
-    // Create the physics-enabled sprite
+    // Create the physics-enabled sprite (representing the player's body)
     this.sprite = this.scene.physics.add.sprite(x, y, "player");
     this.sprite.setScale(1);
+    
+    // Constrain the sprite to world bounds
     this.sprite.setCollideWorldBounds(true);
 
-    this.head = this.scene.add.image(x, y - 95, "player-head");
-    this.head.setScale(0.9);
-    this.head.setDepth(this.sprite.depth + 1);
+    // --- Attachment Images Creation ---
+    // Create the head and gun images attached to the player
+    this.head = this.scene.add.image(x, y, "player-head");
+    this.gun = this.scene.add.image(x, y, "player-gun");
 
-    this.gun = this.scene.add.image(x + 25, y - 10, "player-gun");
-    this.gun.setScale(0.9);
-    this.gun.setDepth(this.sprite.depth + 1);
+    // Set depths so elements overlay correctly
+    this.sprite.setDepth(10);
+    this.head.setDepth(11);
+    this.gun.setDepth(12);
 
     // --- Animation Creation ---
     this.createAnimations();
@@ -50,9 +58,17 @@ export default class Player {
         up: Phaser.Input.Keyboard.KeyCodes.W,
         down: Phaser.Input.Keyboard.KeyCodes.S,
         left: Phaser.Input.Keyboard.KeyCodes.A,
-        right: Phaser.Input.Keyboard.KeyCodes.D,
+        right: Phaser.Input.Keyboard.KeyCodes.D
       });
     }
+
+    // --- Solve the Physics Position Lag ---
+    // Register to Phaser's POST_UPDATE event. This event fires after Arcade Physics
+    // finishes calculating and updating body positions, but before rendering the frame.
+    this.scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.postUpdate, this);
+
+    // Clean up event listeners when the player sprite is destroyed
+    this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
 
   /**
@@ -99,15 +115,10 @@ export default class Player {
     let isMoving = false;
 
     // Read movements from both arrow keys (cursors) and WASD keys
-    const leftDown =
-      (cursors && cursors.left.isDown) || (this.wasd && this.wasd.left.isDown);
-    const rightDown =
-      (cursors && cursors.right.isDown) ||
-      (this.wasd && this.wasd.right.isDown);
-    const upDown =
-      (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
-    const downDown =
-      (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
+    const leftDown = (cursors && cursors.left.isDown) || (this.wasd && this.wasd.left.isDown);
+    const rightDown = (cursors && cursors.right.isDown) || (this.wasd && this.wasd.right.isDown);
+    const upDown = (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
+    const downDown = (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
 
     // Handle horizontal movement
     if (leftDown) {
@@ -131,10 +142,7 @@ export default class Player {
 
     // Animation state machine logic
     if (isMoving) {
-      if (
-        !this.sprite.anims.isPlaying ||
-        this.sprite.anims.currentAnim.key !== "player-run"
-      ) {
+      if (!this.sprite.anims.isPlaying || this.sprite.anims.currentAnim.key !== "player-run") {
         this.sprite.play("player-run");
       }
     } else {
@@ -146,23 +154,53 @@ export default class Player {
         this.sprite.setFrame(0);
       }
     }
-    const headOffsetX = this.sprite.flipX ? 15 : -15;
-    this.head.x = this.sprite.x + headOffsetX;
-    this.head.y = this.sprite.y - 95;
+  }
 
-    this.head.flipX = this.sprite.flipX;
+  /**
+   * Sync positions of attachments post-update to eliminate 1-frame position lag.
+   * This executes after physics updates body position but before rendering.
+   */
+  postUpdate() {
+    if (!this.sprite || !this.sprite.active) return;
 
-    const gunOffsetX = this.sprite.flipX ? -25 : 25;
+    // Flip offsets horizontally based on sprite direction
+    const flipMultiplier = this.sprite.flipX ? -1 : 1;
 
-    this.gun.x = this.sprite.x + gunOffsetX;
-    this.gun.y = this.sprite.y - 10;
+    // Sync positions
+    this.head.setPosition(
+      this.sprite.x + this.headOffset.x * flipMultiplier,
+      this.sprite.y + this.headOffset.y
+    );
+    
+    this.gun.setPosition(
+      this.sprite.x + this.gunOffset.x * flipMultiplier,
+      this.sprite.y + this.gunOffset.y
+    );
 
-    this.gun.flipX = this.sprite.flipX;
-    console.log(this.sprite.x, this.head.x, this.gun.x);
+    // Sync flip states
+    this.head.setFlipX(this.sprite.flipX);
+    this.gun.setFlipX(this.sprite.flipX);
+  }
+
+  /**
+   * Cleanup method to destroy children and detach scene event listeners
+   * to avoid memory leaks.
+   */
+  destroy() {
+    if (this.scene && this.scene.events) {
+      this.scene.events.off(Phaser.Scenes.Events.POST_UPDATE, this.postUpdate, this);
+    }
+    
+    if (this.head) {
+      this.head.destroy();
+    }
+    if (this.gun) {
+      this.gun.destroy();
+    }
   }
 
   // --- Future OOP Systems & Actions ---
-
+  
   /**
    * Apply damage to the player
    * @param {number} amount Damage amount
@@ -188,8 +226,8 @@ export default class Player {
   die() {
     console.log("Player died!");
     this.sprite.disableBody(true, true);
-    this.head.setVisible(false);
-    this.gun.setVisible(false);
+    if (this.head) this.head.setVisible(false);
+    if (this.gun) this.gun.setVisible(false);
   }
 
   /**
