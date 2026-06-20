@@ -52,20 +52,39 @@ export default class GameScene extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.player.getSprite());
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.decorations = this.add.group();
-    const decorPositions = [
-      // Top row
-      { x: 200, y: -50, key: "decor1" },
-      { x: 600, y: -50, key: "decor2" },
-      { x: 1050, y: -50, key: "decor1" },
-      { x: 1450, y: -50, key: "decor2" },
-      // { x: 1750, y: -50, key: "decor1" },
+    // Create a static physics group for the stones (obstacles)
+    this.stones = this.physics.add.staticGroup();
 
-      // Right side
-      { x: 1860, y: 150, key: "decor2" },
-      { x: 1880, y: 500, key: "decor1" },
-      { x: 1850, y: 950, key: "decor2" },
-    ];
+    // Place stones along the world border edges (world is 5000 x 5000)
+    // We scale them down to 0.4 (thin) to occupy less playing space,
+    // and randomly switch between decor1 and decor2 for variety.
+    
+    // Top border
+    for (let x = 100; x <= 4900; x += 180) {
+      const key = Math.random() < 0.5 ? "decor1" : "decor2";
+      this.stones.create(x, 99, key).setScale(0.7).refreshBody().setDepth(5);
+    }
+
+    // Bottom border
+    for (let x = 100; x <= 4900; x += 180) {
+      const key = Math.random() < 0.5 ? "decor1" : "decor2";
+      this.stones.create(x, 4980, key).setScale(0.7).refreshBody().setDepth(5);
+    }
+
+    // Left border (avoiding duplicate corner stones)
+    for (let y = 280; y <= 4720; y += 180) {
+      const key = Math.random() < 0.5 ? "decor1" : "decor2";
+      this.stones.create(99, y, key).setScale(0.7).refreshBody().setDepth(5);
+    }
+
+    // Right border (avoiding duplicate corner stones)
+    for (let y = 280; y <= 4720; y += 180) {
+      const key = Math.random() < 0.5 ? "decor1" : "decor2";
+      this.stones.create(4900, y, key).setScale(0.7).refreshBody().setDepth(5);
+    }
+
+    // Prevent the player from crossing the stones
+    this.physics.add.collider(this.player.getSprite(), this.stones);
     this.gridContainer = this.add.container();
 
     const CELL_WIDTH = 128;
@@ -90,13 +109,7 @@ export default class GameScene extends Phaser.Scene {
     this.gridContainer.setPosition(470, 250);
 
     this.gridContainer.setDepth(-90);
-    decorPositions.forEach((pos) => {
-      const d = this.add.image(pos.x, pos.y, pos.key);
 
-      d.setDepth(-50);
-
-      d.setScale(0.8);
-    });
     // this.add.rectangle(960, 540, 1920, 1080).setStrokeStyle(10, 0xff0000);
 
     this.anims.create({
