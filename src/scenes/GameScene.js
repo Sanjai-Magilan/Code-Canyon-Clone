@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-// import Player from "../entities/Player";
+import Player from "../entities/Player";
 import Enemy from "../entities/Enemy";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
@@ -12,6 +12,9 @@ import top_electrode from "../assets/Sprites/BG/electrode/electrode-a0-001.png";
 import bottom_electrode from "../assets/Sprites/BG/electrode/electrode-a0-000.png";
 import top_electrode_wire from "../assets/Sprites/BG/electrode/electrocable-animation 1-000.png";
 import bottom_electrode_wire from "../assets/Sprites/BG/electrode/electrocable-animation 1-001.png";
+import playerHead from "../assets/Sprites/Player/head/playerhead-default-000.png";
+import playerRun from "../assets/Sprites/Player/run/player_run.png";
+import playerGun from "../assets/Sprites/Guns/gun0/playergun-gun-000.png";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -22,6 +25,7 @@ export default class GameScene extends Phaser.Scene {
       frameWidth: 198,
       frameHeight: 186,
     });
+
     this.load.image("worm-shadow", shadowImg);
     this.load.image("bg", bg);
     this.load.image("carrot", farm);
@@ -32,18 +36,28 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("bottomElectrode", bottom_electrode);
     this.load.image("topElectrodeWire", top_electrode_wire);
     this.load.image("bottomElectrodeWire", bottom_electrode_wire);
+    this.load.spritesheet("player", playerRun, {
+      frameWidth: 80,
+      frameHeight: 103,
+    });
+    this.load.image("player-head", playerHead);
+    this.load.image("player-gun", playerGun);
   }
   create() {
+    this.physics.world.setBounds(0, 0, 5000, 5000);
+    this.cameras.main.setBounds(0, 0, 5000, 5000);
     this.playerHP = 100;
-    this.bg = this.add.image(
-      960, // 1920 / 2
-      540, // 1080 / 2
-      "bg",
-    );
-
-    this.bg.setDisplaySize(1920, 1080);
+    this.bg = this.add.tileSprite(2500, 2500, 5000, 5000, "bg");
 
     this.bg.setDepth(-100);
+    const border = this.add.graphics();
+
+    border.lineStyle(20, 0xff0000);
+    border.strokeRect(0, 0, 5000, 5000);
+    this.player = new Player(this, 800, 600);
+
+    this.cameras.main.startFollow(this.player.getSprite());
+    this.cursors = this.input.keyboard.createCursorKeys();
     this.decorations = this.add.group();
     const decorPositions = [
       // Top row
@@ -90,7 +104,7 @@ export default class GameScene extends Phaser.Scene {
       d.setScale(0.8);
     });
     // this.add.rectangle(960, 540, 1920, 1080).setStrokeStyle(10, 0xff0000);
-    // this.player = new Player(this, 150, 360);
+
     this.anims.create({
       key: "worm-run",
       frames: this.anims.generateFrameNumbers("worm", { start: 0, end: 12 }),
@@ -117,5 +131,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Bottom electrode wire
     this.add.image(145, 1020, "bottomElectrodeWire").setScale(0.8).setDepth(9);
+  }
+  update() {
+    this.player.update(this.cursors);
+    window.console.log("test");
+    
   }
 }
