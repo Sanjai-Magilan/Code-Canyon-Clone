@@ -45,7 +45,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.bg.setDepth(-100);
 
-    this.player = new Player(this, 800, 600);
+    this.player = new Player(this, 2500, 2500);
 
     this.cameras.main.startFollow(this.player.getSprite());
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -55,7 +55,7 @@ export default class GameScene extends Phaser.Scene {
     // Place stones along the world border edges (world is 5000 x 5000)
     // We scale them down to 0.4 (thin) to occupy less playing space,
     // and randomly switch between decor1 and decor2 for variety.
-    
+
     // Top border
     for (let x = 100; x <= 4900; x += 180) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
@@ -87,10 +87,13 @@ export default class GameScene extends Phaser.Scene {
     const CELL_WIDTH = 128;
     const CELL_HEIGHT = 128;
 
-    for (let row = 0; row < 7; row++) {
+    const rows = Math.ceil(5000 / CELL_HEIGHT);
+    const cols = Math.ceil(5000 / CELL_WIDTH);
+
+    for (let row = 0; row < rows; row++) {
       const startCol = row % 2;
 
-      for (let col = startCol; col < 10; col += 2) {
+      for (let col = startCol; col < cols; col += 2) {
         const tile = this.add.image(
           col * CELL_WIDTH,
           row * CELL_HEIGHT,
@@ -103,8 +106,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    this.gridContainer.setPosition(470, 250);
-
+    this.gridContainer.setPosition(0, 0);
     this.gridContainer.setDepth(-90);
 
     // this.add.rectangle(960, 540, 1920, 1080).setStrokeStyle(10, 0xff0000);
@@ -124,11 +126,9 @@ export default class GameScene extends Phaser.Scene {
         this.enemy.moveOneBeat();
       },
     });
-
   }
   update() {
     this.player.update(this.cursors);
     window.console.log("test");
-    
   }
 }
