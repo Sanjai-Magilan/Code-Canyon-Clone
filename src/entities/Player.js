@@ -74,6 +74,9 @@ export default class Player {
       this,
     );
 
+    // Listen to scene shutdown to ensure cleanup if scene changes
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+
     // Clean up event listeners when the player sprite is destroyed
     this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
@@ -151,8 +154,10 @@ export default class Player {
       this.sprite.setVelocityY(this.speed);
       isMoving = true;
     }
-    // Fix diagonal speed
-    this.sprite.body.velocity.normalize().scale(this.speed);
+    // Fix diagonal speed only if actively moving to avoid scaling collision velocities
+    if (isMoving) {
+      this.sprite.body.velocity.normalize().scale(this.speed);
+    }
 
     // Animation state machine logic
     if (isMoving) {
@@ -200,6 +205,14 @@ export default class Player {
     // Sync flip states
     this.head.setFlipX(this.sprite.flipX);
     this.gun.setFlipX(this.sprite.flipX);
+    if (this.flash && this.flash.active) {
+      const flashOffsetX = this.sprite.flipX ? -90 : 90;
+      const flashOffsetY = -13;
+
+      this.flash.x = this.gun.x + flashOffsetX;
+      this.flash.y = this.gun.y + flashOffsetY;
+      this.flash.flipX = this.sprite.flipX;
+    }
   }
 
   /**
@@ -213,6 +226,11 @@ export default class Player {
         this.postUpdate,
         this,
       );
+      this.scene.events.off(
+        Phaser.Scenes.Events.SHUTDOWN,
+        this.destroy,
+        this,
+      );
     }
 
     if (this.head) {
@@ -220,6 +238,9 @@ export default class Player {
     }
     if (this.gun) {
       this.gun.destroy();
+    }
+    if (this.flash) {
+      this.flash.destroy();
     }
   }
 
@@ -266,5 +287,33 @@ export default class Player {
    */
   addItemToInventory(item) {
     this.inventory.push(item);
+  }
+  shoot() {
+    if (this.flash && this.flash.active) {
+      this.flash.destroy();
+    }
+
+    const flashOffsetX = this.sprite.flipX ? -90 : 90;
+    const flashOffsetY = -10;
+
+    const flashSprite = this.scene.add.sprite(
+      this.gun.x + flashOffsetX,
+      this.gun.y + flashOffsetY,
+      "gunfire"
+    );
+    this.flash = flashSprite;
+
+    this.flash.setScale(0.7);
+    this.flash.setDepth(this.gun.depth + 1);
+    this.flash.setFlipX(this.sprite.flipX);
+
+    this.flash.play("gun-fire");
+
+    flashSprite.once("animationcomplete", () => {
+      flashSprite.destroy();
+      if (this.flash === flashSprite) {
+        this.flash = null;
+      }
+    });
   }
 }
