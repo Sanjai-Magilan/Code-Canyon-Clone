@@ -151,6 +151,8 @@ export default class Player {
       this.sprite.setVelocityY(this.speed);
       isMoving = true;
     }
+    // Fix diagonal speed
+    this.sprite.body.velocity.normalize().scale(this.speed);
 
     // Animation state machine logic
     if (isMoving) {
