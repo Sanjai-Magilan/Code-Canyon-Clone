@@ -17,7 +17,7 @@ export default class Player {
     this.headOffset = { x: -10, y: -90 };
     this.headFloatAmplitude = 2; // pixels
     this.headFloatSpeed = 0.004; // animation speed
-    this.gunOffset = { x: 25, y: -16 };
+    this.gunOffset = { x: 22, y: -15 };
 
     // --- OOP Structural Framework for Future Additions ---
     this.health = 100;

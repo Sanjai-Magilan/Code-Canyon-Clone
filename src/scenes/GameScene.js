@@ -115,20 +115,42 @@ export default class GameScene extends Phaser.Scene {
       key: "worm-run",
       frames: this.anims.generateFrameNumbers("worm", { start: 0, end: 12 }),
       frameRate: 13,
-      repeat: 0,
+      repeat: -1,
     });
 
-    this.enemy = new Enemy(this, 1000, 360);
+    this.enemies = [];
+
     this.time.addEvent({
-      delay: 1000,
+      delay: 3000,
       loop: true,
       callback: () => {
-        this.enemy.moveOneBeat();
+        const enemy = this.spawnEnemyNearPlayer();
+        this.enemies.push(enemy);
       },
     });
   }
   update() {
     this.player.update(this.cursors);
-    window.console.log("test");
+
+    const playerSprite = this.player.getSprite();
+
+    for (const enemy of this.enemies) {
+      enemy.update(playerSprite);
+    }
+  }
+  spawnEnemyNearPlayer() {
+    const player = this.player.getSprite();
+
+    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+
+    // Spawn 800px away from player
+    const distance = 800;
+
+    const x = player.x + Math.cos(angle) * distance;
+    const y = player.y + Math.sin(angle) * distance;
+
+    const enemy = new Enemy(this, x, y);
+
+    return enemy;
   }
 }

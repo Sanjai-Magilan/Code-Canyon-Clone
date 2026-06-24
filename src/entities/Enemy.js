@@ -1,8 +1,10 @@
+import Phaser from "phaser";
+
 export default class Enemy {
   constructor(scene, x, y) {
     this.scene = scene;
 
-    this.shadow = scene.add.image(x + 10, y + 50, "worm-shadow");
+    this.shadow = scene.add.image(x + 10, y + 40, "worm-shadow");
 
     this.shadow.setScale(0.7);
 
@@ -14,28 +16,23 @@ export default class Enemy {
     this.sprite.setScale(0.8);
 
     this.isMoving = false;
+
+    // Start worm running animation immediately
+    this.sprite.play("worm-run");
   }
 
-  moveOneBeat() {
-    if (this.isMoving) return;
+  update(player) {
+    const angle = Phaser.Math.Angle.Between(
+      this.sprite.x,
+      this.sprite.y,
+      player.x,
+      player.y,
+    );
 
-    this.isMoving = true;
-
-    this.sprite.play("worm-run");
-
-    this.scene.tweens.add({
-      targets: [this.sprite, this.shadow],
-
-      x: "-=60",
-
-      duration: 300,
-
-      onComplete: () => {
-        this.sprite.stop();
-        this.sprite.setFrame(0);
-
-        this.isMoving = false;
-      },
-    });
+    this.sprite.x += Math.cos(angle) * 2;
+    this.sprite.y += Math.sin(angle) * 2;
+    this.shadow.x = this.sprite.x + 10;
+    this.shadow.y = this.sprite.y + 40;
   }
 }
+
