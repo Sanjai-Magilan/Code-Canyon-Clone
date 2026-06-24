@@ -15,6 +15,8 @@ export default class Player {
     // Configurable offsets for head and gun relative to the sprite center
     // Adjust these offsets to line up the parts with the main body sprite
     this.headOffset = { x: -10, y: -90 };
+    this.headFloatAmplitude = 2; // pixels
+    this.headFloatSpeed = 0.004; // animation speed
     this.gunOffset = { x: 25, y: -16 };
 
     // --- OOP Structural Framework for Future Additions ---
@@ -25,14 +27,14 @@ export default class Player {
     this.interactionSystem = {
       interact: () => {
         console.log("Interacting with nearby object...");
-      }
+      },
     };
 
     // --- Sprite & Physics Creation ---
     // Create the physics-enabled sprite (representing the player's body)
     this.sprite = this.scene.physics.add.sprite(x, y, "player");
     this.sprite.setScale(0.8);
-    
+
     // Constrain the sprite to world bounds
     this.sprite.setCollideWorldBounds(true);
 
@@ -59,14 +61,18 @@ export default class Player {
         up: Phaser.Input.Keyboard.KeyCodes.W,
         down: Phaser.Input.Keyboard.KeyCodes.S,
         left: Phaser.Input.Keyboard.KeyCodes.A,
-        right: Phaser.Input.Keyboard.KeyCodes.D
+        right: Phaser.Input.Keyboard.KeyCodes.D,
       });
     }
 
     // --- Solve the Physics Position Lag ---
     // Register to Phaser's POST_UPDATE event. This event fires after Arcade Physics
     // finishes calculating and updating body positions, but before rendering the frame.
-    this.scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.postUpdate, this);
+    this.scene.events.on(
+      Phaser.Scenes.Events.POST_UPDATE,
+      this.postUpdate,
+      this,
+    );
 
     // Clean up event listeners when the player sprite is destroyed
     this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
@@ -116,10 +122,15 @@ export default class Player {
     let isMoving = false;
 
     // Read movements from both arrow keys (cursors) and WASD keys
-    const leftDown = (cursors && cursors.left.isDown) || (this.wasd && this.wasd.left.isDown);
-    const rightDown = (cursors && cursors.right.isDown) || (this.wasd && this.wasd.right.isDown);
-    const upDown = (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
-    const downDown = (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
+    const leftDown =
+      (cursors && cursors.left.isDown) || (this.wasd && this.wasd.left.isDown);
+    const rightDown =
+      (cursors && cursors.right.isDown) ||
+      (this.wasd && this.wasd.right.isDown);
+    const upDown =
+      (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
+    const downDown =
+      (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
 
     // Handle horizontal movement
     if (leftDown) {
@@ -143,7 +154,10 @@ export default class Player {
 
     // Animation state machine logic
     if (isMoving) {
-      if (!this.sprite.anims.isPlaying || this.sprite.anims.currentAnim.key !== "player-run") {
+      if (
+        !this.sprite.anims.isPlaying ||
+        this.sprite.anims.currentAnim.key !== "player-run"
+      ) {
         this.sprite.play("player-run");
       }
     } else {
@@ -168,14 +182,17 @@ export default class Player {
     const flipMultiplier = this.sprite.flipX ? -1 : 1;
 
     // Sync positions
+    const headBob =
+      Math.sin(this.scene.time.now * this.headFloatSpeed) *
+      this.headFloatAmplitude;
+
     this.head.setPosition(
       this.sprite.x + this.headOffset.x * flipMultiplier,
-      this.sprite.y + this.headOffset.y
+      this.sprite.y + this.headOffset.y + headBob,
     );
-    
     this.gun.setPosition(
       this.sprite.x + this.gunOffset.x * flipMultiplier,
-      this.sprite.y + this.gunOffset.y
+      this.sprite.y + this.gunOffset.y,
     );
 
     // Sync flip states
@@ -189,9 +206,13 @@ export default class Player {
    */
   destroy() {
     if (this.scene && this.scene.events) {
-      this.scene.events.off(Phaser.Scenes.Events.POST_UPDATE, this.postUpdate, this);
+      this.scene.events.off(
+        Phaser.Scenes.Events.POST_UPDATE,
+        this.postUpdate,
+        this,
+      );
     }
-    
+
     if (this.head) {
       this.head.destroy();
     }
@@ -201,7 +222,7 @@ export default class Player {
   }
 
   // --- Future OOP Systems & Actions ---
-  
+
   /**
    * Apply damage to the player
    * @param {number} amount Damage amount
