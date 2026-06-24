@@ -10,11 +10,11 @@ export default class Player {
     this.scene = scene;
 
     // --- Configurable Properties ---
-    this.speed = 600; // Movement speed in pixels per second
+    this.speed = 800; // Movement speed in pixels per second
 
     // Configurable offsets for head and gun relative to the sprite center
     // Adjust these offsets to line up the parts with the main body sprite
-    this.headOffset = { x: -10, y: -110 };
+    this.headOffset = { x: -10, y: -90 };
     this.gunOffset = { x: 25, y: -16 };
 
     // --- OOP Structural Framework for Future Additions ---
@@ -31,7 +31,7 @@ export default class Player {
     // --- Sprite & Physics Creation ---
     // Create the physics-enabled sprite (representing the player's body)
     this.sprite = this.scene.physics.add.sprite(x, y, "player");
-    this.sprite.setScale(1);
+    this.sprite.setScale(0.8);
     
     // Constrain the sprite to world bounds
     this.sprite.setCollideWorldBounds(true);
@@ -39,8 +39,9 @@ export default class Player {
     // --- Attachment Images Creation ---
     // Create the head and gun images attached to the player
     this.head = this.scene.add.image(x, y, "player-head");
+    this.head.setScale(0.8);
     this.gun = this.scene.add.image(x, y, "player-gun");
-
+    this.gun.setScale(0.8);
     // Set depths so elements overlay correctly
     this.sprite.setDepth(10);
     this.head.setDepth(11);

@@ -57,27 +57,27 @@ export default class GameScene extends Phaser.Scene {
     // and randomly switch between decor1 and decor2 for variety.
 
     // Top border
-    for (let x = 100; x <= 4900; x += 180) {
+    for (let x = 100; x <= 4900; x += 350) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(x, 99, key).setScale(0.7).refreshBody().setDepth(5);
+      this.stones.create(x, 10, key).setScale(0.5).refreshBody().setDepth(5);
     }
 
     // Bottom border
-    for (let x = 100; x <= 4900; x += 180) {
+    for (let x = 100; x <= 4900; x += 350) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(x, 4980, key).setScale(0.7).refreshBody().setDepth(5);
+      this.stones.create(x, 5000, key).setScale(0.5).refreshBody().setDepth(5);
     }
 
     // Left border (avoiding duplicate corner stones)
-    for (let y = 280; y <= 4720; y += 180) {
+    for (let y = 280; y <= 4900; y += 350) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(99, y, key).setScale(0.7).refreshBody().setDepth(5);
+      this.stones.create(50, y, key).setScale(0.5).refreshBody().setDepth(5);
     }
 
     // Right border (avoiding duplicate corner stones)
-    for (let y = 280; y <= 4720; y += 180) {
+    for (let y = 280; y <= 4900; y += 350) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(4900, y, key).setScale(0.7).refreshBody().setDepth(5);
+      this.stones.create(4950, y, key).setScale(0.5).refreshBody().setDepth(5);
     }
 
     // Prevent the player from crossing the stones
