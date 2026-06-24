@@ -12,7 +12,7 @@ import playerHead from "../assets/Sprites/Player/head/playerhead-default-000.png
 import playerRun from "../assets/Sprites/Player/run/player_run.png";
 import playerGun from "../assets/Sprites/Guns/gun0/playergun-gun-000.png";
 import gunfireSheet from "../assets/Sprites/Guns/gun-fire/gunfire_sheet copy.png";
-
+import bullet from "../assets/Sprites/Guns/gun0/bullet.png";
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene");

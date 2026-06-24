@@ -5,7 +5,7 @@ export default class Enemy {
     this.scene = scene;
 
     this.shadow = scene.add.image(x + 10, y + 40, "worm-shadow");
-    this.shadow.setScale(0.7);
+    this.shadow.setScale(0.8);
 
     // Create a physics-enabled sprite for frame-rate independent movement & collisions
     this.sprite = scene.physics.add.sprite(x, y, "worm");
@@ -39,12 +39,12 @@ export default class Enemy {
 
     // Face the player
     const movingLeft = player.x < this.sprite.x;
-    this.sprite.setFlipX(movingLeft);
+    this.sprite.setFlipX(!movingLeft);
 
     // Update shadow position and mirroring to stay synced with the parent sprite
-    const shadowOffsetX = movingLeft ? -10 : 10;
+    const shadowOffsetX = movingLeft ? 10 : -10;
     this.shadow.x = this.sprite.x + shadowOffsetX;
-    this.shadow.y = this.sprite.y + 40;
+    this.shadow.y = this.sprite.y + 60;
     this.shadow.setFlipX(movingLeft);
   }
 

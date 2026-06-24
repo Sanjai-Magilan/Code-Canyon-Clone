@@ -207,7 +207,7 @@ export default class Player {
     this.gun.setFlipX(this.sprite.flipX);
     if (this.flash && this.flash.active) {
       const flashOffsetX = this.sprite.flipX ? -90 : 90;
-      const flashOffsetY = -13;
+      const flashOffsetY = -15;
 
       this.flash.x = this.gun.x + flashOffsetX;
       this.flash.y = this.gun.y + flashOffsetY;
@@ -226,11 +226,7 @@ export default class Player {
         this.postUpdate,
         this,
       );
-      this.scene.events.off(
-        Phaser.Scenes.Events.SHUTDOWN,
-        this.destroy,
-        this,
-      );
+      this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     }
 
     if (this.head) {
@@ -299,7 +295,7 @@ export default class Player {
     const flashSprite = this.scene.add.sprite(
       this.gun.x + flashOffsetX,
       this.gun.y + flashOffsetY,
-      "gunfire"
+      "gunfire",
     );
     this.flash = flashSprite;
 
@@ -308,6 +304,13 @@ export default class Player {
     this.flash.setFlipX(this.sprite.flipX);
 
     this.flash.play("gun-fire");
+    this.scene.tweens.add({
+      targets: this.gun,
+      angle: this.sprite.flipX ? 8 : -8,
+      duration: 40,
+      yoyo: true,
+      ease: "Power2",
+    });
 
     flashSprite.once("animationcomplete", () => {
       flashSprite.destroy();
