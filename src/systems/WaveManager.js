@@ -1,5 +1,6 @@
 import Worm from "../entities/Worm";
 import Crab from "../entities/Crab";
+import Angler from "../entities/Angler";
 
 export default class WaveManager {
   /**
@@ -12,7 +13,8 @@ export default class WaveManager {
     // Map enemy keys to their respective class constructors
     this.enemyRegistry = {
       worm: Worm,
-      crab: Crab
+      crab: Crab,
+      angler: Angler
     };
 
     // Define time-based wave configuration timeline
@@ -35,6 +37,17 @@ export default class WaveManager {
         enemies: [
           { type: "worm", weight: 0.7 },
           { type: "crab", weight: 0.3 }
+        ]
+      },
+      {
+        id: 3,
+        duration: 60, // 2:00 - 3:00 (seconds)
+        spawnInterval: 1000, // ms
+        maxEnemies: 40,
+        enemies: [
+          { type: "worm", weight: 0.5 },
+          { type: "crab", weight: 0.3 },
+          { type: "angler", weight: 0.2 }
         ]
       }
     ];

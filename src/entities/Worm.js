@@ -1,4 +1,5 @@
 import Enemy from "./Enemy";
+import ENEMY_CONFIG from "../config/enemyConfig";
 
 export default class Worm extends Enemy {
   /**
@@ -9,6 +10,16 @@ export default class Worm extends Enemy {
    */
   constructor(scene, x, y) {
     // Inherit base physics and AI movement using Worm visual configurations
-    super(scene, x, y, "worm", "worm-run", "worm-shadow");
+    super(
+      scene,
+      x,
+      y,
+      "worm",
+      "worm-run",
+      "worm-shadow",
+      ENEMY_CONFIG.speed,
+      ENEMY_CONFIG.scale,
+      ENEMY_CONFIG.shadow
+    );
   }
 }

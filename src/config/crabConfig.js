@@ -10,6 +10,12 @@ const CRAB_CONFIG = Object.freeze({
   projectileLifetime: 3000, // milliseconds before bullet despawns
   scale: 0.8,
   depth: 10,
+  shadow: Object.freeze({
+    offsetX: 0,
+    offsetY: 40,
+    updateOffsetX: 0,
+    updateOffsetY: 50,
+  }),
 });
 
 export default CRAB_CONFIG;

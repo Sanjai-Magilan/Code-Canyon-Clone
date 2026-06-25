@@ -21,14 +21,20 @@ export default class Enemy {
     animKey = "worm-run",
     shadowKey = "worm-shadow",
     speed = ENEMY_CONFIG.speed,
-    scale = ENEMY_CONFIG.scale
+    scale = ENEMY_CONFIG.scale,
+    shadowConfig = ENEMY_CONFIG.shadow
   ) {
     this.scene = scene;
     this.speed = speed;
     this.scale = scale;
+    this.shadowConfig = shadowConfig || ENEMY_CONFIG.shadow;
 
-    // Attach shadow under the sprite
-    this.shadow = scene.add.image(x + 10, y + 40, shadowKey);
+    // Attach shadow under the sprite using config
+    this.shadow = scene.add.image(
+      x + this.shadowConfig.offsetX,
+      y + this.shadowConfig.offsetY,
+      shadowKey
+    );
     this.shadow.setScale(this.scale);
 
     // Create physics-enabled sprite for collisions and updates
@@ -70,10 +76,10 @@ export default class Enemy {
     const movingLeft = player.x < this.sprite.x;
     this.sprite.setFlipX(!movingLeft);
 
-    // Synchronize shadow positioning relative to parent body
-    const shadowOffsetX = movingLeft ? 10 : -10;
+    // Synchronize shadow positioning relative to parent body using config
+    const shadowOffsetX = movingLeft ? this.shadowConfig.updateOffsetX : -this.shadowConfig.updateOffsetX;
     this.shadow.x = this.sprite.x + shadowOffsetX;
-    this.shadow.y = this.sprite.y + 60;
+    this.shadow.y = this.sprite.y + this.shadowConfig.updateOffsetY;
     this.shadow.setFlipX(movingLeft);
   }
 

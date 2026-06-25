@@ -3,6 +3,7 @@ import Player from "../entities/Player";
 import WaveManager from "../systems/WaveManager";
 import crabRun from "../assets/Sprites/Enemy/enemy 2/encrabskin-run-sheet.png";
 import crabBulletImg from "../assets/Sprites/Enemy/enemy 2/enbulletskin-0-000.png";
+import anglerRun from "../assets/Sprites/Enemy/enemy 3/enangler-run-sheet.png";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -36,6 +37,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.spritesheet("crab", crabRun, {
       frameWidth: 178,
       frameHeight: 199,
+    });
+    this.load.spritesheet("angler", anglerRun, {
+      frameWidth: 219,
+      frameHeight: 230,
     });
 
     this.load.image("worm-shadow", shadowImg);
@@ -170,6 +175,13 @@ export default class GameScene extends Phaser.Scene {
       key: "crab-run",
       frames: this.anims.generateFrameNumbers("crab", { start: 0, end: 8 }),
       frameRate: 10,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: "angler-run",
+      frames: this.anims.generateFrameNumbers("angler", { start: 0, end: 14 }),
+      frameRate: 12,
       repeat: -1,
     });
 

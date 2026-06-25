@@ -15,7 +15,7 @@ export default class RangedEnemy extends Enemy {
    * @param {object} rangedConfig Configuration object containing stats and tolerances
    */
   constructor(scene, x, y, texture, animKey, shadowKey, rangedConfig) {
-    // Call generic Enemy constructor to set up pathing and base sprite
+    // Call generic Enemy constructor to set up pathing, base sprite, and shadow configs
     super(
       scene,
       x,
@@ -24,7 +24,8 @@ export default class RangedEnemy extends Enemy {
       animKey,
       shadowKey,
       rangedConfig.speed,
-      rangedConfig.scale
+      rangedConfig.scale,
+      rangedConfig.shadow
     );
 
     this.rangedConfig = rangedConfig;
@@ -47,6 +48,13 @@ export default class RangedEnemy extends Enemy {
     // Maintain stationary posture and halt velocity during firing animation
     if (this.isShooting) {
       this.sprite.setVelocity(0, 0);
+
+      // Keep shadow in sync when shooting (since update is returned early)
+      const facingLeft = !this.sprite.flipX;
+      const shadowOffsetX = facingLeft ? this.shadowConfig.updateOffsetX : -this.shadowConfig.updateOffsetX;
+      this.shadow.x = this.sprite.x + shadowOffsetX;
+      this.shadow.y = this.sprite.y + this.shadowConfig.updateOffsetY;
+      this.shadow.setFlipX(facingLeft);
       return;
     }
 
