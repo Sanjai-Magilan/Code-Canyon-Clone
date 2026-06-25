@@ -72,6 +72,12 @@ export default class ProjectileManager {
     if (index !== -1) {
       const enemy = scene.enemies[index];
       scene.enemies.splice(index, 1);
+      
+      // Spawn death explosion at enemy position
+      if (typeof scene.spawnEnemyExplosion === "function") {
+        scene.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
+      }
+      
       enemy.sprite.destroy(); // Triggers destroy callback for shadow cleanup
     }
   }

@@ -6,6 +6,7 @@ import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
 import BULLET_CONFIG from "../config/bulletConfig";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
+import explosionSheet from "../assets/Sprites/Enemy/explosion/explosion-sheet.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
 import bg from "../assets/Sprites/BG/floor/tiledfloor.png";
 // import farm from "../assets/Sprites/BG/farm/carrot.png";
@@ -49,6 +50,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.spritesheet("gunfire", gunfireSheet, {
       frameWidth: 128,
       frameHeight: 128,
+    });
+    this.load.spritesheet("explosion", explosionSheet, {
+      frameWidth: 512,
+      frameHeight: 512,
     });
   }
 
@@ -176,6 +181,18 @@ export default class GameScene extends Phaser.Scene {
       repeat: 0,
     });
 
+    if (!this.anims.exists("enemy-explosion")) {
+      this.anims.create({
+        key: "enemy-explosion",
+        frames: this.anims.generateFrameNumbers("explosion", {
+          start: 0,
+          end: 6,
+        }),
+        frameRate: 16,
+        repeat: 0,
+      });
+    }
+
     this.input.on("pointerdown", () => {
       this.player.shoot();
     });
@@ -222,6 +239,17 @@ export default class GameScene extends Phaser.Scene {
     return enemy;
   }
 
+  spawnEnemyExplosion(x, y) {
+    const explosion = this.add.sprite(x, y, "explosion");
+    explosion.setScale(0.5);
+    explosion.setDepth(y + 10);
+    explosion.play("enemy-explosion");
+
+    explosion.once("animationcomplete", () => {
+      explosion.destroy();
+    });
+  }
+
   handlePlayerEnemyCollision(playerSprite, enemySprite) {
     // Deal damage to the player
     this.player.takeDamage(ENEMY_CONFIG.collisionDamage);
@@ -231,6 +259,8 @@ export default class GameScene extends Phaser.Scene {
     if (index !== -1) {
       const enemy = this.enemies[index];
       this.enemies.splice(index, 1);
+      
+      this.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
       enemy.sprite.destroy(); // Properly destroys sprite and hooks shadow cleanup
     }
   }
