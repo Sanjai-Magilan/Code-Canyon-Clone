@@ -1,10 +1,14 @@
 import Phaser from "phaser";
 import Player from "../entities/Player";
 import Enemy from "../entities/Enemy";
+import WORLD_CONFIG from "../config/worldConfig";
+import CHARACTERS from "../config/characterConfig";
+import ENEMY_CONFIG from "../config/enemyConfig";
+import BULLET_CONFIG from "../config/bulletConfig";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
 import bg from "../assets/Sprites/BG/floor/tiledfloor.png";
-import farm from "../assets/Sprites/BG/farm/carrot.png";
+// import farm from "../assets/Sprites/BG/farm/carrot.png";
 import decor1 from "../assets/Sprites/BG/stons/bgdesign-animation 1-000.png";
 import decor2 from "../assets/Sprites/BG/stons/bgdesign-animation 1-001.png";
 import floorPatch from "../assets/Sprites/BG/floor/popfade.png";
@@ -13,6 +17,9 @@ import playerRun from "../assets/Sprites/Player/run/player_run.png";
 import playerGun from "../assets/Sprites/Guns/gun0/playergun-gun-000.png";
 import gunfireSheet from "../assets/Sprites/Guns/gun-fire/gunfire_sheet copy.png";
 import bullet from "../assets/Sprites/Guns/gun0/bullet.png";
+import ProjectileManager from "../systems/ProjectileManager";
+import PlayerShadow from "../assets/Sprites/Player/player-animation 1-000.png";
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene");
@@ -25,8 +32,9 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.load.image("worm-shadow", shadowImg);
+    this.load.image("player-shadow", PlayerShadow);
     this.load.image("bg", bg);
-    this.load.image("carrot", farm);
+    // this.load.image("carrot", farm);
     this.load.image("decor1", decor1);
     this.load.image("decor2", decor2);
     this.load.image("floorPatch", floorPatch);
@@ -37,7 +45,7 @@ export default class GameScene extends Phaser.Scene {
     });
     this.load.image("player-head", playerHead);
     this.load.image("player-gun", playerGun);
-
+    this.load.image("bullet", bullet);
     this.load.spritesheet("gunfire", gunfireSheet, {
       frameWidth: 128,
       frameHeight: 128,
@@ -45,13 +53,17 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.setBounds(0, 0, 5000, 5000);
-    this.cameras.main.setBounds(0, 0, 5000, 5000);
-    this.playerHP = 100;
-    this.bg = this.add.tileSprite(2500, 2500, 5000, 5000, "bg");
+    const worldWidth = WORLD_CONFIG.width;
+    const worldHeight = WORLD_CONFIG.height;
+
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.bg = this.add.tileSprite(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, "bg");
     this.bg.setDepth(-100);
 
-    this.player = new Player(this, 2500, 2500);
+    // Initialize player with a specific character configuration key (e.g. "soldier")
+    this.player = new Player(this, worldWidth / 2, worldHeight / 2, "soldier");
+    this.playerHP = this.player.maxHealth;
 
     this.cameras.main.startFollow(this.player.getSprite());
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -60,31 +72,35 @@ export default class GameScene extends Phaser.Scene {
     this.stones = this.physics.add.staticGroup();
 
     // Place stones along the world border edges to form a solid wall
-    // 128px step size closes the gaps completely to keep player/enemies inside bounds.
-    const BORDER_STEP = 128;
+    const borderStep = WORLD_CONFIG.stones.step;
+    const stoneScale = WORLD_CONFIG.stones.scale;
 
     // Top border
-    for (let x = 64; x <= 4936; x += BORDER_STEP) {
+    for (let x = borderStep / 2; x <= worldWidth - borderStep / 2; x += borderStep) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(x, 24, key).setScale(0.5).refreshBody();
+      const stone = this.stones.create(x, 24, key).setScale(stoneScale).refreshBody();
+      stone.setDepth(stone.y);
     }
 
     // Bottom border
-    for (let x = 64; x <= 4936; x += BORDER_STEP) {
+    for (let x = borderStep / 2; x <= worldWidth - borderStep / 2; x += borderStep) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(x, 4976, key).setScale(0.5).refreshBody();
+      const stone = this.stones.create(x, worldHeight - 24, key).setScale(stoneScale).refreshBody();
+      stone.setDepth(stone.y);
     }
 
     // Left border (avoiding duplicate corner stones)
-    for (let y = 160; y <= 4840; y += BORDER_STEP) {
+    for (let y = borderStep + 32; y <= worldHeight - borderStep - 32; y += borderStep) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(24, y, key).setScale(0.5).refreshBody();
+      const stone = this.stones.create(24, y, key).setScale(stoneScale).refreshBody();
+      stone.setDepth(stone.y);
     }
 
     // Right border (avoiding duplicate corner stones)
-    for (let y = 160; y <= 4840; y += BORDER_STEP) {
+    for (let y = borderStep + 32; y <= worldHeight - borderStep - 32; y += borderStep) {
       const key = Math.random() < 0.5 ? "decor1" : "decor2";
-      this.stones.create(4976, y, key).setScale(0.5).refreshBody();
+      const stone = this.stones.create(worldWidth - 24, y, key).setScale(stoneScale).refreshBody();
+      stone.setDepth(stone.y);
     }
 
     // Prevent player from passing the stone walls
@@ -92,7 +108,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Physics group for enemy collision and physics handling
     this.enemiesGroup = this.physics.add.group();
-    
+
     // Prevent enemies from passing the stone walls
     this.physics.add.collider(this.enemiesGroup, this.stones);
 
@@ -102,32 +118,31 @@ export default class GameScene extends Phaser.Scene {
       this.enemiesGroup,
       this.handlePlayerEnemyCollision,
       null,
-      this
+      this,
     );
 
-    this.gridContainer = this.add.container();
+    // Initialize the ProjectileManager system to handle spawning & physics of bullets
+    this.projectileManager = new ProjectileManager(this);
 
-    const CELL_WIDTH = 128;
-    const CELL_HEIGHT = 128;
-    const rows = Math.ceil(5000 / CELL_HEIGHT);
-    const cols = Math.ceil(5000 / CELL_WIDTH);
+    const CELL_WIDTH = WORLD_CONFIG.grid.cellWidth;
+    const CELL_HEIGHT = WORLD_CONFIG.grid.cellHeight;
+    const rows = Math.ceil(WORLD_CONFIG.height / CELL_HEIGHT);
+    const cols = Math.ceil(WORLD_CONFIG.width / CELL_WIDTH);
 
-    // Generate grid across the entire map, centering each tile inside its grid cell
+    // High-performance Blitter for grid tiling (reduces draw calls and removes 800 GameObjects)
+    const gridBlitter = this.add.blitter(0, 0, "floorPatch");
+    gridBlitter.setDepth(-90);
+    gridBlitter.alpha = WORLD_CONFIG.grid.alpha;
+
     for (let row = 0; row < rows; row++) {
       const startCol = row % 2;
       for (let col = startCol; col < cols; col += 2) {
-        const tile = this.add.image(
+        gridBlitter.create(
           col * CELL_WIDTH + CELL_WIDTH / 2,
-          row * CELL_HEIGHT + CELL_HEIGHT / 2,
-          "floorPatch"
+          row * CELL_HEIGHT + CELL_HEIGHT / 2
         );
-        tile.setAlpha(0.05);
-        this.gridContainer.add(tile);
       }
     }
-
-    this.gridContainer.setPosition(0, 0);
-    this.gridContainer.setDepth(-90);
 
     this.anims.create({
       key: "worm-run",
@@ -138,13 +153,16 @@ export default class GameScene extends Phaser.Scene {
 
     this.enemies = [];
 
-    // Spawn enemies periodically
+    // Spawn enemies periodically (capped at config maxActive to prevent crash/infinite growth leaks)
     this.time.addEvent({
-      delay: 3000,
+      delay: ENEMY_CONFIG.spawn.delay,
       loop: true,
       callback: () => {
-        const enemy = this.spawnEnemyNearPlayer();
-        this.enemies.push(enemy);
+        // Option A: Active count matches array length because dead enemies are spliced out instantly
+        if (this.enemies.length < ENEMY_CONFIG.spawn.maxActive) {
+          const enemy = this.spawnEnemyNearPlayer();
+          this.enemies.push(enemy);
+        }
       },
     });
 
@@ -168,11 +186,6 @@ export default class GameScene extends Phaser.Scene {
 
     const playerSprite = this.player.getSprite();
 
-    // Remove destroyed enemies to prevent array memory leaks
-    this.enemies = this.enemies.filter(
-      (enemy) => enemy.sprite && enemy.sprite.active
-    );
-
     // Update enemy AI behaviors (pathfinding/velocity update)
     for (const enemy of this.enemies) {
       enemy.update(playerSprite);
@@ -190,18 +203,14 @@ export default class GameScene extends Phaser.Scene {
       enemy.sprite.setDepth(enemy.sprite.y);
       enemy.shadow.setDepth(enemy.sprite.y - 1);
     }
-
-    this.stones.getChildren().forEach((stone) => {
-      stone.setDepth(stone.y);
-    });
   }
 
   spawnEnemyNearPlayer() {
     const player = this.player.getSprite();
     const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
 
-    // Spawn 1200px away to guarantee they spawn completely outside the player viewport
-    const distance = 1200;
+    // Spawn distance from config to guarantee off-screen spawning
+    const distance = ENEMY_CONFIG.spawn.distance;
     const x = player.x + Math.cos(angle) * distance;
     const y = player.y + Math.sin(angle) * distance;
 
@@ -215,7 +224,7 @@ export default class GameScene extends Phaser.Scene {
 
   handlePlayerEnemyCollision(playerSprite, enemySprite) {
     // Deal damage to the player
-    this.player.takeDamage(10);
+    this.player.takeDamage(ENEMY_CONFIG.collisionDamage);
 
     // Find and destroy the enemy wrapper
     const index = this.enemies.findIndex((e) => e.sprite === enemySprite);

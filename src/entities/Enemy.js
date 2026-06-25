@@ -1,17 +1,18 @@
 import Phaser from "phaser";
+import ENEMY_CONFIG from "../config/enemyConfig";
 
 export default class Enemy {
   constructor(scene, x, y) {
     this.scene = scene;
 
     this.shadow = scene.add.image(x + 10, y + 40, "worm-shadow");
-    this.shadow.setScale(0.8);
+    this.shadow.setScale(ENEMY_CONFIG.scale);
 
     // Create a physics-enabled sprite for frame-rate independent movement & collisions
     this.sprite = scene.physics.add.sprite(x, y, "worm");
-    this.sprite.setScale(0.8);
+    this.sprite.setScale(ENEMY_CONFIG.scale);
     
-    this.speed = 120; // Pixels per second
+    this.speed = ENEMY_CONFIG.speed; // Pixels per second
     this.isMoving = true;
 
     // Start worm running animation immediately

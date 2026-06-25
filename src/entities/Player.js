@@ -1,59 +1,71 @@
 import Phaser from "phaser";
+import Weapon from "./Weapon";
+import CHARACTERS from "../config/characterConfig";
 
 export default class Player {
   /**
    * @param {Phaser.Scene} scene The parent scene
    * @param {number} x The initial x coordinate
    * @param {number} y The initial y coordinate
+   * @param {string|object} characterInput The character configuration key or object (defaults to "soldier")
    */
-  constructor(scene, x, y) {
+  constructor(scene, x, y, characterInput = "soldier") {
     this.scene = scene;
 
-    // --- Configurable Properties ---
-    this.speed = 800; // Movement speed in pixels per second
+    // Load character configuration dynamically (supports string key or config object)
+    this.characterConfig = typeof characterInput === "string"
+      ? (CHARACTERS[characterInput] || CHARACTERS.soldier)
+      : characterInput;
 
-    // Configurable offsets for head and gun relative to the sprite center
-    // Adjust these offsets to line up the parts with the main body sprite
-    this.headOffset = { x: -10, y: -90 };
-    this.headFloatAmplitude = 2; // pixels
-    this.headFloatSpeed = 0.004; // animation speed
-    this.gunOffset = { x: 22, y: -15 };
+    // --- Character Stats ---
+    this.speed = this.characterConfig.speed;
+    this.health = this.characterConfig.maxHealth;
+    this.maxHealth = this.characterConfig.maxHealth;
 
-    // --- OOP Structural Framework for Future Additions ---
-    this.health = 100;
-    this.maxHealth = 100;
-    this.weapons = [];
-    this.inventory = [];
+    // --- Visual Offsets & Recoil Parameters ---
+    this.headOffset = this.characterConfig.headOffset;
+    this.headFloatAmplitude = this.characterConfig.headFloatAmplitude;
+    this.headFloatSpeed = this.characterConfig.headFloatSpeed;
+    this.gunOffset = this.characterConfig.gunOffset;
+    this.recoilOffset = 0; // Visual recoil offset
+    this.recoilAngle = 0;  // Visual recoil angle rotation
+
+    // --- Interaction System ---
     this.interactionSystem = {
       interact: () => {
         console.log("Interacting with nearby object...");
       },
     };
 
+    // Instantiate weapon automatically based on character configuration
+    this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
+
     // --- Sprite & Physics Creation ---
-    // Create the physics-enabled sprite (representing the player's body)
-    this.sprite = this.scene.physics.add.sprite(x, y, "player");
-    this.sprite.setScale(0.8);
+    this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
+    this.sprite.setScale(this.characterConfig.scale);
 
     // Constrain the sprite to world bounds
     this.sprite.setCollideWorldBounds(true);
+    this.shadow = this.scene.add.image(x, y + 40, this.characterConfig.shadowTexture);
+    this.shadow.setScale(this.characterConfig.scale);
+    this.shadow.setDepth(this.characterConfig.depth - 1);
 
     // --- Attachment Images Creation ---
-    // Create the head and gun images attached to the player
-    this.head = this.scene.add.image(x, y, "player-head");
-    this.head.setScale(0.8);
-    this.gun = this.scene.add.image(x, y, "player-gun");
-    this.gun.setScale(0.8);
+    this.head = this.scene.add.image(x, y, this.characterConfig.headTexture);
+    this.head.setScale(this.characterConfig.scale);
+    this.gun = this.scene.add.image(x, y, this.characterConfig.gunTexture);
+    this.gun.setScale(this.characterConfig.scale);
+
     // Set depths so elements overlay correctly
-    this.sprite.setDepth(10);
-    this.head.setDepth(11);
-    this.gun.setDepth(12);
+    this.sprite.setDepth(this.characterConfig.depth);
+    this.head.setDepth(this.characterConfig.depth + 1);
+    this.gun.setDepth(this.characterConfig.depth + 2);
 
     // --- Animation Creation ---
     this.createAnimations();
 
     // Play default run animation (starts playing immediately)
-    this.sprite.play("player-run");
+    this.sprite.play(`${this.characterConfig.bodyTexture}-run`);
 
     // --- Input Setup (WASD Keys) ---
     if (this.scene.input && this.scene.input.keyboard) {
@@ -66,8 +78,6 @@ export default class Player {
     }
 
     // --- Solve the Physics Position Lag ---
-    // Register to Phaser's POST_UPDATE event. This event fires after Arcade Physics
-    // finishes calculating and updating body positions, but before rendering the frame.
     this.scene.events.on(
       Phaser.Scenes.Events.POST_UPDATE,
       this.postUpdate,
@@ -90,25 +100,20 @@ export default class Player {
   }
 
   /**
-   * Internal helper to register player animations.
+   * Internal helper to register character animations dynamically.
    */
   createAnimations() {
-    // Only register player-run animation if it hasn't been defined in the global animations manager
-    if (!this.scene.anims.exists("player-run")) {
+    const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
+    if (!this.scene.anims.exists(runAnimKey)) {
       this.scene.anims.create({
-        key: "player-run",
-        frames: this.scene.anims.generateFrameNumbers("player", {
-          start: 0,
-          end: 3,
+        key: runAnimKey,
+        frames: this.scene.anims.generateFrameNumbers(this.characterConfig.bodyTexture, {
+          start: this.characterConfig.anim.run.start,
+          end: this.characterConfig.anim.run.end,
         }),
-        frameRate: 8,
+        frameRate: this.characterConfig.anim.run.frameRate,
         repeat: -1,
       });
-    }
-
-    // Future animations (e.g. idle animation placeholder)
-    if (!this.scene.anims.exists("player-idle")) {
-      // Define player-idle animation when spritesheets are ready
     }
   }
 
@@ -154,27 +159,24 @@ export default class Player {
       this.sprite.setVelocityY(this.speed);
       isMoving = true;
     }
+
     // Fix diagonal speed only if actively moving to avoid scaling collision velocities
     if (isMoving) {
       this.sprite.body.velocity.normalize().scale(this.speed);
     }
 
     // Animation state machine logic
+    const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
     if (isMoving) {
       if (
         !this.sprite.anims.isPlaying ||
-        this.sprite.anims.currentAnim.key !== "player-run"
+        this.sprite.anims.currentAnim.key !== runAnimKey
       ) {
-        this.sprite.play("player-run");
+        this.sprite.play(runAnimKey);
       }
     } else {
-      // If we have an idle animation, play it here. For now, stop the run animation at frame 0.
-      if (this.scene.anims.exists("player-idle")) {
-        this.sprite.play("player-idle", true);
-      } else {
-        this.sprite.stop();
-        this.sprite.setFrame(0);
-      }
+      this.sprite.stop();
+      this.sprite.setFrame(0);
     }
   }
 
@@ -185,8 +187,23 @@ export default class Player {
   postUpdate() {
     if (!this.sprite || !this.sprite.active) return;
 
+    // Snappy math-based exponential visual recoil decay (zero dynamic allocations)
+    this.recoilOffset *= this.characterConfig.recoil.offsetDecay;
+    if (Math.abs(this.recoilOffset) < 0.1) {
+      this.recoilOffset = 0;
+    }
+
+    this.recoilAngle *= this.characterConfig.recoil.angleDecay;
+    if (Math.abs(this.recoilAngle) < 0.1) {
+      this.recoilAngle = 0;
+    }
+
     // Flip offsets horizontally based on sprite direction
     const flipMultiplier = this.sprite.flipX ? -1 : 1;
+    const shadowOffsetX = this.sprite.flipX ? -0 : 0;
+
+    this.shadow.setPosition(this.sprite.x + shadowOffsetX, this.sprite.y + 30);
+    this.shadow.setFlipX(this.sprite.flipX);
 
     // Sync positions
     const headBob =
@@ -198,20 +215,20 @@ export default class Player {
       this.sprite.y + this.headOffset.y + headBob,
     );
     this.gun.setPosition(
-      this.sprite.x + this.gunOffset.x * flipMultiplier,
+      this.sprite.x + (this.gunOffset.x + this.recoilOffset) * flipMultiplier,
       this.sprite.y + this.gunOffset.y,
     );
+
+    // Apply visual recoil angle
+    this.gun.angle = this.recoilAngle;
 
     // Sync flip states
     this.head.setFlipX(this.sprite.flipX);
     this.gun.setFlipX(this.sprite.flipX);
     if (this.flash && this.flash.active) {
-      const flashOffsetX = this.sprite.flipX ? -90 : 90;
-      const flashOffsetY = -15;
-
-      this.flash.x = this.gun.x + flashOffsetX;
-      this.flash.y = this.gun.y + flashOffsetY;
-      this.flash.flipX = this.sprite.flipX;
+      const muzzle = this.getMuzzlePosition();
+      this.flash.setPosition(muzzle.x, muzzle.y);
+      this.flash.setFlipX(this.sprite.flipX);
     }
   }
 
@@ -226,21 +243,30 @@ export default class Player {
         this.postUpdate,
         this,
       );
-      this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+      this.scene.events.off(
+        Phaser.Scenes.Events.SHUTDOWN,
+        this.destroy,
+        this,
+      );
     }
 
     if (this.head) {
       this.head.destroy();
+      this.head = null;
     }
     if (this.gun) {
       this.gun.destroy();
+      this.gun = null;
     }
     if (this.flash) {
       this.flash.destroy();
+      this.flash = null;
+    }
+    if (this.shadow) {
+      this.shadow.destroy();
+      this.shadow = null;
     }
   }
-
-  // --- Future OOP Systems & Actions ---
 
   /**
    * Apply damage to the player
@@ -269,48 +295,67 @@ export default class Player {
     this.sprite.disableBody(true, true);
     if (this.head) this.head.setVisible(false);
     if (this.gun) this.gun.setVisible(false);
+    if (this.shadow) this.shadow.setVisible(false);
   }
 
   /**
-   * Equips a new weapon
+   * Calculates the exact rotated position of the gun muzzle.
+   * This aligns bullet spawning and muzzle flash visuals precisely, with zero lag or offset.
+   * @returns {{x: number, y: number}}
    */
-  equipWeapon(weapon) {
-    this.weapons.push(weapon);
+  getMuzzlePosition() {
+    const flipMultiplier = this.sprite.flipX ? -1 : 1;
+    const baseOffsetX = 90 * flipMultiplier;
+    const baseOffsetY = -10;
+
+    // Convert gun angle to radians to apply rotation
+    const angleRad = Phaser.Math.DegToRad(this.gun.angle);
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+
+    // Apply rotation matrix relative to the gun's center position
+    const rx = baseOffsetX * cos - baseOffsetY * sin;
+    const ry = baseOffsetX * sin + baseOffsetY * cos;
+
+    return {
+      x: this.gun.x + rx,
+      y: this.gun.y + ry,
+    };
   }
 
-  /**
-   * Adds an item to inventory
-   */
-  addItemToInventory(item) {
-    this.inventory.push(item);
-  }
   shoot() {
+    const muzzle = this.getMuzzlePosition();
+
+    // Delegate cooldown check and get spawn parameters
+    const shotInfo = this.weapon.fire(muzzle, this.sprite.flipX);
+    if (!shotInfo) {
+      return;
+    }
+
+    // Hand off projectile spawning to the scene's ProjectileManager
+    if (this.scene.projectileManager) {
+      this.scene.projectileManager.spawn(shotInfo);
+    }
+
+    // Render visual effects and muzzle flash
     if (this.flash && this.flash.active) {
       this.flash.destroy();
     }
 
-    const flashOffsetX = this.sprite.flipX ? -90 : 90;
-    const flashOffsetY = -10;
-
-    const flashSprite = this.scene.add.sprite(
-      this.gun.x + flashOffsetX,
-      this.gun.y + flashOffsetY,
-      "gunfire",
-    );
+    const flashConfig = this.characterConfig.muzzleFlash;
+    const flashSprite = this.scene.add.sprite(muzzle.x, muzzle.y, flashConfig.texture);
     this.flash = flashSprite;
 
-    this.flash.setScale(0.7);
+    this.flash.setScale(flashConfig.scale);
     this.flash.setDepth(this.gun.depth + 1);
     this.flash.setFlipX(this.sprite.flipX);
 
-    this.flash.play("gun-fire");
-    this.scene.tweens.add({
-      targets: this.gun,
-      angle: this.sprite.flipX ? 8 : -8,
-      duration: 40,
-      yoyo: true,
-      ease: "Power2",
-    });
+    this.flash.play(flashConfig.anim);
+
+    // Apply recoil parameters directly (zero dynamic allocations / tweens)
+    const recoilConfig = this.characterConfig.recoil;
+    this.recoilOffset = recoilConfig.offset;
+    this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;
 
     flashSprite.once("animationcomplete", () => {
       flashSprite.destroy();
