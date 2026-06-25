@@ -158,6 +158,12 @@ export default class GameScene extends Phaser.Scene {
 
     this.enemies = [];
 
+    // Spawn an initial burst of exactly 6 enemies at startup
+    for (let i = 0; i < 6; i++) {
+      const enemy = this.spawnEnemyNearPlayer();
+      this.enemies.push(enemy);
+    }
+
     // Spawn enemies periodically (capped at config maxActive to prevent crash/infinite growth leaks)
     this.time.addEvent({
       delay: ENEMY_CONFIG.spawn.delay,
