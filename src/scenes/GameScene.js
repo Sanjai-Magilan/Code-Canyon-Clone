@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import Player from "../entities/Player";
-import Enemy from "../entities/Enemy";
+import WaveManager from "../systems/WaveManager";
+import crabRun from "../assets/Sprites/Enemy/enemy 2/encrabskin-run-sheet.png";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -30,6 +31,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.spritesheet("worm", wormRun, {
       frameWidth: 198,
       frameHeight: 186,
+    });
+    this.load.spritesheet("crab", crabRun, {
+      frameWidth: 178,
+      frameHeight: 199,
     });
 
     this.load.image("worm-shadow", shadowImg);
@@ -129,6 +134,9 @@ export default class GameScene extends Phaser.Scene {
     // Initialize the ProjectileManager system to handle spawning & physics of bullets
     this.projectileManager = new ProjectileManager(this);
 
+    // Initialize the WaveManager system to handle wave configurations and timer scaling
+    this.waveManager = new WaveManager(this);
+
     const CELL_WIDTH = WORLD_CONFIG.grid.cellWidth;
     const CELL_HEIGHT = WORLD_CONFIG.grid.cellHeight;
     const rows = Math.ceil(WORLD_CONFIG.height / CELL_HEIGHT);
@@ -156,6 +164,13 @@ export default class GameScene extends Phaser.Scene {
       repeat: -1,
     });
 
+    this.anims.create({
+      key: "crab-run",
+      frames: this.anims.generateFrameNumbers("crab", { start: 0, end: 8 }),
+      frameRate: 10,
+      repeat: -1,
+    });
+
     this.enemies = [];
 
     // Spawn an initial burst of exactly 6 enemies at startup
@@ -164,13 +179,14 @@ export default class GameScene extends Phaser.Scene {
       this.enemies.push(enemy);
     }
 
-    // Spawn enemies periodically (capped at config maxActive to prevent crash/infinite growth leaks)
-    this.time.addEvent({
-      delay: ENEMY_CONFIG.spawn.delay,
+    // Spawn enemies periodically (capped at wave limit to prevent crash/infinite growth leaks)
+    this.spawnTimerEvent = this.time.addEvent({
+      delay: this.waveManager.getSpawnInterval(),
       loop: true,
       callback: () => {
-        // Option A: Active count matches array length because dead enemies are spliced out instantly
-        if (this.enemies.length < ENEMY_CONFIG.spawn.maxActive) {
+        // Limit active count dynamically based on the current wave configuration
+        const maxActive = this.waveManager.getMaxEnemies();
+        if (this.enemies.length < maxActive) {
           const enemy = this.spawnEnemyNearPlayer();
           this.enemies.push(enemy);
         }
@@ -207,6 +223,11 @@ export default class GameScene extends Phaser.Scene {
   update() {
     this.player.update(this.cursors);
 
+    // Dynamically adjust spawn delay based on current wave configuration
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
+    }
+
     const playerSprite = this.player.getSprite();
 
     // Update enemy AI behaviors (pathfinding/velocity update)
@@ -237,7 +258,8 @@ export default class GameScene extends Phaser.Scene {
     const x = player.x + Math.cos(angle) * distance;
     const y = player.y + Math.sin(angle) * distance;
 
-    const enemy = new Enemy(this, x, y);
+    const EnemyClass = this.waveManager.getNextEnemyClass();
+    const enemy = new EnemyClass(this, x, y);
     
     // Add enemy sprite to the physics group so collision handles it
     this.enemiesGroup.add(enemy.sprite);
