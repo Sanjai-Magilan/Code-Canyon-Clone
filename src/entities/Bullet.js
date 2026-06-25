@@ -2,8 +2,8 @@ import Phaser from "phaser";
 import BULLET_CONFIG from "../config/bulletConfig";
 
 export default class Bullet extends Phaser.Physics.Arcade.Image {
-  constructor(scene, x, y) {
-    super(scene, x, y, "bullet");
+  constructor(scene, x, y, texture = "bullet") {
+    super(scene, x, y, texture);
     this.setScale(BULLET_CONFIG.scale);
     this.speed = BULLET_CONFIG.speed; // Pixels per second (frame-rate independent)
     this.setDepth(BULLET_CONFIG.depth);
@@ -17,7 +17,7 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    * @param {number} speed Trajectory velocity speed
    * @param {number} scale Image sprite scale multiplier
    */
-  fire(x, y, angle, speed = this.speed, scale = null) {
+  fire(x, y, angle, speed = this.speed, scale = null, lifetime = null) {
     // Re-enable the physics body and make the bullet active and visible
     this.enableBody(true, x, y, true, true);
     
@@ -32,6 +32,13 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
     
     // Align sprite orientation with velocity direction
     this.setRotation(angle);
+
+    // Set depth dynamically to render above characters while maintaining Y-sorting
+    this.setDepth(y + 50);
+
+    // Track spawn timing and lifetime limits
+    this.timeFired = this.scene.time.now;
+    this.lifetime = lifetime;
   }
 
   /**
@@ -43,6 +50,12 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
 
   update() {
     if (!this.active || !this.body) return;
+
+    // Check if bullet exceeded its configured lifetime limits
+    if (this.lifetime && this.scene.time.now - this.timeFired >= this.lifetime) {
+      this.deactivate();
+      return;
+    }
 
     // Return bullet to pool if it goes outside the world bounds
     const bounds = this.scene.physics.world.bounds;

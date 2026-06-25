@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import Player from "../entities/Player";
 import WaveManager from "../systems/WaveManager";
 import crabRun from "../assets/Sprites/Enemy/enemy 2/encrabskin-run-sheet.png";
+import crabBulletImg from "../assets/Sprites/Enemy/enemy 2/enbulletskin-0-000.png";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -52,6 +53,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("player-head", playerHead);
     this.load.image("player-gun", playerGun);
     this.load.image("bullet", bullet);
+    this.load.image("crab-bullet", crabBulletImg);
     this.load.spritesheet("gunfire", gunfireSheet, {
       frameWidth: 128,
       frameHeight: 128,
@@ -184,11 +186,15 @@ export default class GameScene extends Phaser.Scene {
       delay: this.waveManager.getSpawnInterval(),
       loop: true,
       callback: () => {
-        // Limit active count dynamically based on the current wave configuration
-        const maxActive = this.waveManager.getMaxEnemies();
-        if (this.enemies.length < maxActive) {
-          const enemy = this.spawnEnemyNearPlayer();
-          this.enemies.push(enemy);
+        try {
+          // Limit active count dynamically based on the current wave configuration
+          const maxActive = this.waveManager.getMaxEnemies();
+          if (this.enemies.length < maxActive) {
+            const enemy = this.spawnEnemyNearPlayer();
+            this.enemies.push(enemy);
+          }
+        } catch (err) {
+          console.error("CRITICAL SPANNING ERROR:", err);
         }
       },
     });
@@ -221,31 +227,46 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update() {
-    this.player.update(this.cursors);
+    try {
+      this.player.update(this.cursors);
 
-    // Dynamically adjust spawn delay based on current wave configuration
-    if (this.spawnTimerEvent) {
-      this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
-    }
+      // Dynamically adjust spawn delay based on current wave configuration
+      if (this.spawnTimerEvent) {
+        this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
+      }
 
-    const playerSprite = this.player.getSprite();
+      const playerSprite = this.player.getSprite();
 
-    // Update enemy AI behaviors (pathfinding/velocity update)
-    for (const enemy of this.enemies) {
-      enemy.update(playerSprite);
-    }
+      // Update enemy AI behaviors (pathfinding/velocity update)
+      for (const enemy of this.enemies) {
+        enemy.update(playerSprite);
+      }
 
-    // Dynamic depth sorting (Y-Sorting) for correct overlapping visuals
-    playerSprite.setDepth(playerSprite.y);
-    this.player.head.setDepth(playerSprite.y + 0.1);
-    this.player.gun.setDepth(playerSprite.y + 0.2);
-    if (this.player.flash && this.player.flash.active) {
-      this.player.flash.setDepth(playerSprite.y + 0.3);
-    }
+      // Dynamic depth sorting (Y-Sorting) for correct overlapping visuals
+      playerSprite.setDepth(playerSprite.y);
+      this.player.head.setDepth(playerSprite.y + 0.1);
+      this.player.gun.setDepth(playerSprite.y + 0.2);
+      if (this.player.flash && this.player.flash.active) {
+        this.player.flash.setDepth(playerSprite.y + 0.3);
+      }
 
-    for (const enemy of this.enemies) {
-      enemy.sprite.setDepth(enemy.sprite.y);
-      enemy.shadow.setDepth(enemy.sprite.y - 1);
+      for (const enemy of this.enemies) {
+        enemy.sprite.setDepth(enemy.sprite.y);
+        enemy.shadow.setDepth(enemy.sprite.y - 1);
+      }
+    } catch (err) {
+      console.error("CRITICAL RUNTIME ERROR IN UPDATE:", err);
+      if (!this.errorText) {
+        this.errorText = this.add.text(50, 50, "CRITICAL ERROR: " + err.message, {
+          fontSize: "24px",
+          color: "#ff0000",
+          backgroundColor: "#000000",
+          padding: { x: 10, y: 10 }
+        });
+        this.errorText.setScrollFactor(0);
+        this.errorText.setDepth(99999);
+      }
+      this.physics.pause();
     }
   }
 

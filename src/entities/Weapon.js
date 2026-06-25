@@ -36,7 +36,9 @@ export default class Weapon {
 
     this.lastFired = timeNow;
 
-    const baseAngle = isFlipped ? Math.PI : 0;
+    const baseAngle = typeof isFlipped === "number"
+      ? isFlipped
+      : (isFlipped ? Math.PI : 0);
     const spreadRad = Phaser.Math.DegToRad(this.config.spread || 0);
     const count = this.config.bulletCount || 1;
 
@@ -44,6 +46,7 @@ export default class Weapon {
     const bulletTexture = this.config.bulletTexture || "bullet";
     const bulletSpeed = this.config.bulletSpeed || 1200;
     const bulletScale = this.config.bulletScale || 0.6;
+    const bulletLifetime = this.config.projectileLifetime || null;
 
     if (count <= 1) {
       // If there's spread but only 1 bullet (like a machine gun), apply random spread
@@ -54,7 +57,8 @@ export default class Weapon {
         angle: angle,
         bulletTexture,
         bulletSpeed,
-        bulletScale
+        bulletScale,
+        bulletLifetime
       });
     } else {
       // For multi-bullet weapons (like shotgun), distribute them evenly across the spread range
@@ -66,7 +70,8 @@ export default class Weapon {
           angle: angle,
           bulletTexture,
           bulletSpeed,
-          bulletScale
+          bulletScale,
+          bulletLifetime
         });
       }
     }

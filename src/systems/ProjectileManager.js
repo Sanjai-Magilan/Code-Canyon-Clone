@@ -16,8 +16,19 @@ export default class ProjectileManager {
       maxSize: BULLET_CONFIG.maxSize
     });
 
+    // Initialize the pooled physics group for enemy bullets
+    this.enemyBullets = scene.physics.add.group({
+      classType: Bullet,
+      runChildUpdate: true,
+      maxSize: BULLET_CONFIG.maxSize
+    });
+
     // Recycle bullets when they collide with obstacles (static stones)
     scene.physics.add.collider(this.bullets, scene.stones, (bullet) => {
+      bullet.deactivate();
+    });
+
+    scene.physics.add.collider(this.enemyBullets, scene.stones, (bullet) => {
       bullet.deactivate();
     });
 
@@ -29,32 +40,83 @@ export default class ProjectileManager {
       null,
       this
     );
+
+    // Check for overlaps between enemy bullets and the player
+    scene.physics.add.overlap(
+      this.enemyBullets,
+      scene.player.getSprite(),
+      this.handleBulletPlayerCollision,
+      null,
+      this
+    );
   }
 
   /**
    * Spawns/recycles projectiles. Supports both a single shot info object or an array of them.
    * @param {object|object[]} shotData Coordinate and angle data
+   * @param {boolean} isEnemy True if spawned by an enemy unit
    */
-  spawn(shotData) {
+  spawn(shotData, isEnemy = false) {
     if (Array.isArray(shotData)) {
       for (let i = 0; i < shotData.length; i++) {
-        this.spawnSingle(shotData[i]);
+        this.spawnSingle(shotData[i], isEnemy);
       }
     } else if (shotData) {
-      this.spawnSingle(shotData);
+      this.spawnSingle(shotData, isEnemy);
     }
   }
 
   /**
    * Spawns/recycles a single projectile.
    * @param {object} info Shot info containing x, y, angle, bulletTexture, bulletSpeed, and bulletScale
+   * @param {boolean} isEnemy True if spawned by an enemy unit
    * @private
    */
-  spawnSingle(info) {
+  spawnSingle(info, isEnemy) {
+    const group = isEnemy ? this.enemyBullets : this.bullets;
     // Set the texture dynamically when getting the bullet from the pool
-    const bullet = this.bullets.get(info.x, info.y, info.bulletTexture);
+    const bullet = group.get(info.x, info.y, info.bulletTexture);
     if (bullet) {
-      bullet.fire(info.x, info.y, info.angle, info.bulletSpeed, info.bulletScale);
+      bullet.fire(
+        info.x,
+        info.y,
+        info.angle,
+        info.bulletSpeed,
+        info.bulletScale,
+        info.bulletLifetime
+      );
+    }
+  }
+
+  /**
+   * Handles collision logic when an enemy bullet hits the player.
+   * @param {any} arg1 First physics object in overlap
+   * @param {any} arg2 Second physics object in overlap
+   */
+  handleBulletPlayerCollision(arg1, arg2) {
+    // Determine which argument is the bullet by checking for the deactivate method
+    let bullet = null;
+    if (arg1 && typeof arg1.deactivate === "function") {
+      bullet = arg1;
+    } else if (arg2 && typeof arg2.deactivate === "function") {
+      bullet = arg2;
+    }
+
+    if (bullet) {
+      bullet.deactivate(); // Recycle bullet to pool
+    } else {
+      // Fallback: deactivate whichever is not the player sprite
+      const playerSprite = this.scene.player ? this.scene.player.getSprite() : null;
+      if (arg1 && arg1 !== playerSprite && typeof arg1.disableBody === "function") {
+        arg1.disableBody(true, true);
+      } else if (arg2 && arg2 !== playerSprite && typeof arg2.disableBody === "function") {
+        arg2.disableBody(true, true);
+      }
+    }
+
+    // Deal damage to the Player wrapper in the scene
+    if (this.scene.player) {
+      this.scene.player.takeDamage(10); // Standard damage value
     }
   }
 

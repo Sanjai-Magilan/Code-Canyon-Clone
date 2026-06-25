@@ -1,3 +1,5 @@
+import CRAB_CONFIG from "./crabConfig";
+
 const WEAPON_CONFIG = Object.freeze({
   pistol: Object.freeze({
     fireRate: 350, // ms cooldown
@@ -22,6 +24,15 @@ const WEAPON_CONFIG = Object.freeze({
     bulletTexture: "bullet",
     bulletSpeed: 2400,
     bulletScale: 0.6,
+  }),
+  crab_weapon: Object.freeze({
+    fireRate: CRAB_CONFIG.shootCooldown,
+    bulletCount: 1,
+    spread: 0,
+    bulletTexture: "crab-bullet",
+    bulletSpeed: CRAB_CONFIG.bulletSpeed,
+    bulletScale: 0.8,
+    projectileLifetime: CRAB_CONFIG.projectileLifetime,
   }),
   default: Object.freeze({
     fireRate: 350,

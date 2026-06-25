@@ -273,10 +273,8 @@ export default class Player {
    * @param {number} amount Damage amount
    */
   takeDamage(amount) {
-    this.health = Math.max(0, this.health - amount);
-    if (this.health <= 0) {
-      this.die();
-    }
+    // Infinite health for dev purposes (ignore all incoming damage)
+    return;
   }
 
   /**
