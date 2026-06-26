@@ -5,6 +5,8 @@ const ENEMY_CONFIG = Object.freeze({
     delay: 3000,
     distance: 1200,
     maxActive: 40,
+    margin: 100,
+    maxAttempts: 10,
   }),
   collisionDamage: 10,
   shadow: Object.freeze({

@@ -313,12 +313,85 @@ export default class GameScene extends Phaser.Scene {
 
   spawnEnemyNearPlayer() {
     const player = this.player.getSprite();
-    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-
-    // Spawn distance from config to guarantee off-screen spawning
     const distance = ENEMY_CONFIG.spawn.distance;
-    const x = player.x + Math.cos(angle) * distance;
-    const y = player.y + Math.sin(angle) * distance;
+    const margin = ENEMY_CONFIG.spawn.margin;
+    const maxAttempts = ENEMY_CONFIG.spawn.maxAttempts;
+    const worldWidth = WORLD_CONFIG.width;
+    const worldHeight = WORLD_CONFIG.height;
+    const camera = this.cameras.main;
+
+    let x = 0;
+    let y = 0;
+    let validSpawn = false;
+
+    // Try up to maxAttempts random angles to find a spawn point within boundaries and outside viewport
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      x = player.x + Math.cos(angle) * distance;
+      y = player.y + Math.sin(angle) * distance;
+
+      const outsideScreen = !camera.worldView.contains(x, y);
+
+      if (
+        x >= margin &&
+        x <= worldWidth - margin &&
+        y >= margin &&
+        y <= worldHeight - margin &&
+        outsideScreen
+      ) {
+        validSpawn = true;
+        break;
+      }
+    }
+
+    // Fallback: If no valid spawn point was found within maxAttempts
+    if (!validSpawn) {
+      // 1. Clamp to world boundaries with margin
+      x = Phaser.Math.Clamp(x, margin, worldWidth - margin);
+      y = Phaser.Math.Clamp(y, margin, worldHeight - margin);
+
+      // 2. Ensure clamped position is outside the viewport
+      if (camera.worldView.contains(x, y)) {
+        // 3. Move spawn point to the nearest valid edge just outside the camera
+        const camLeft = camera.worldView.x;
+        const camRight = camera.worldView.right;
+        const camTop = camera.worldView.y;
+        const camBottom = camera.worldView.bottom;
+        const padding = 60; // Padding to ensure sprite spawns completely off-screen
+        const candidates = [];
+
+        // Left Candidate
+        const candidateLeftX = camLeft - padding;
+        if (candidateLeftX >= margin && candidateLeftX <= worldWidth - margin) {
+          candidates.push({ x: candidateLeftX, y: y, dist: Math.abs(x - candidateLeftX) });
+        }
+
+        // Right Candidate
+        const candidateRightX = camRight + padding;
+        if (candidateRightX >= margin && candidateRightX <= worldWidth - margin) {
+          candidates.push({ x: candidateRightX, y: y, dist: Math.abs(x - candidateRightX) });
+        }
+
+        // Top Candidate
+        const candidateTopY = camTop - padding;
+        if (candidateTopY >= margin && candidateTopY <= worldHeight - margin) {
+          candidates.push({ x: x, y: candidateTopY, dist: Math.abs(y - candidateTopY) });
+        }
+
+        // Bottom Candidate
+        const candidateBottomY = camBottom + padding;
+        if (candidateBottomY >= margin && candidateBottomY <= worldHeight - margin) {
+          candidates.push({ x: x, y: candidateBottomY, dist: Math.abs(y - candidateBottomY) });
+        }
+
+        // Select the closest valid candidate to minimize position snap
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => a.dist - b.dist);
+          x = candidates[0].x;
+          y = candidates[0].y;
+        }
+      }
+    }
 
     const EnemyClass = this.waveManager.getNextEnemyClass();
     const enemy = new EnemyClass(this, x, y);
