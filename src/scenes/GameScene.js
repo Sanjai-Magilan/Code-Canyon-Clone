@@ -5,6 +5,7 @@ import crabRun from "../assets/Sprites/Enemy/enemy 2/encrabskin-run-sheet.png";
 import crabBulletImg from "../assets/Sprites/Enemy/enemy 2/enbulletskin-0-000.png";
 import anglerRun from "../assets/Sprites/Enemy/enemy 3/enangler-run-sheet.png";
 import bgmAudio from "../assets/Sounds/bgm/musicBg.webm";
+import shootAudio from "../assets/Sounds/guns/shoot0.webm";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -69,6 +70,7 @@ export default class GameScene extends Phaser.Scene {
       frameHeight: 512,
     });
     this.load.audio("bgm", bgmAudio);
+    this.load.audio("shoot", shootAudio);
   }
 
   create() {

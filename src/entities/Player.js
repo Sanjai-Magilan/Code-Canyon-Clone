@@ -330,6 +330,9 @@ export default class Player {
       return;
     }
 
+    // Play gun shoot sound effect
+    this.scene.sound.play("shoot", { volume: 0.4 });
+
     // Hand off projectile spawning to the scene's ProjectileManager
     if (this.scene.projectileManager) {
       this.scene.projectileManager.spawn(shotInfo);
