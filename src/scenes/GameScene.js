@@ -500,23 +500,11 @@ export default class GameScene extends Phaser.Scene {
     // Deal damage to the player
     this.player.takeDamage(ENEMY_CONFIG.collisionDamage);
 
-    // Find and destroy the enemy wrapper
+    // Find and destroy the enemy wrapper via its unified die method
     const index = this.enemies.findIndex((e) => e.sprite === enemySprite);
     if (index !== -1) {
       const enemy = this.enemies[index];
-      this.enemies.splice(index, 1);
-      
-      this.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
-
-      // Roll and spawn weapon drop if successful
-      if (typeof enemy.dropGunId === "function") {
-        const gunId = enemy.dropGunId();
-        if (gunId && this.weaponDropManager) {
-          this.weaponDropManager.spawnPickup(enemySprite.x, enemySprite.y, gunId);
-        }
-      }
-
-      enemy.sprite.destroy(); // Properly destroys sprite and hooks shadow cleanup
+      enemy.die();
     }
   }
 }

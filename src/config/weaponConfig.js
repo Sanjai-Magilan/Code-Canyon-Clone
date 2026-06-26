@@ -9,6 +9,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 2000,
     bulletScale: 0.6,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 50,
   }),
   shotgun: Object.freeze({
     fireRate: 750,
@@ -18,6 +19,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 1600,
     bulletScale: 0.5,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 50,
   }),
   machineGun: Object.freeze({
     fireRate: 100,
@@ -27,6 +29,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 2400,
     bulletScale: 0.6,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 50,
   }),
   crab_weapon: Object.freeze({
     fireRate: CRAB_CONFIG.shootCooldown,
@@ -36,6 +39,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: CRAB_CONFIG.bulletSpeed,
     bulletScale: 0.8,
     projectileLifetime: CRAB_CONFIG.projectileLifetime,
+    bulletDamage: 10,
   }),
   gun1: Object.freeze({
     fireRate: 120,
@@ -45,6 +49,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 2200,
     bulletScale: 0.6,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 100,
   }),
   gun4: Object.freeze({
     fireRate: 600,
@@ -54,6 +59,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 1700,
     bulletScale: 0.5,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 50,
   }),
   gun5: Object.freeze({
     fireRate: 150,
@@ -63,6 +69,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletSpeed: 3500,
     bulletScale: 1.5,
     velocityInheritanceFactor: 0.0,
+    bulletDamage: 200,
   }),
   default: Object.freeze({
     fireRate: 350,
@@ -71,6 +78,7 @@ const WEAPON_CONFIG = Object.freeze({
     bulletTexture: "bullet",
     bulletSpeed: 2000,
     bulletScale: 0.6,
+    bulletDamage: 50,
   })
 });
 

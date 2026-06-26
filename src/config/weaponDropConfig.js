@@ -1,11 +1,11 @@
 const WEAPON_DROP_CONFIG = Object.freeze({
   crab: Object.freeze({
-    gun1: 0.25
+    gun1: 0.15
   }),
 
   angler: Object.freeze({
-    gun4: 0.25,
-    gun5: 0.05
+    gun4: 0.15,
+    gun5: 0.01
   }),
 
   durations: Object.freeze({
@@ -17,7 +17,7 @@ const WEAPON_DROP_CONFIG = Object.freeze({
     gun5: 2
   }),
 
-  pickupLifetime: 15000
+  pickupLifetime: 10000
 });
 
 export default WEAPON_DROP_CONFIG;

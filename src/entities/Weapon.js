@@ -47,6 +47,7 @@ export default class Weapon {
     const bulletSpeed = this.config.bulletSpeed || 1200;
     const bulletScale = this.config.bulletScale || 0.6;
     const bulletLifetime = this.config.projectileLifetime || null;
+    const bulletDamage = this.config.bulletDamage !== undefined ? this.config.bulletDamage : 50;
 
     if (count <= 1) {
       // If there's spread but only 1 bullet (like a machine gun), apply random spread
@@ -59,6 +60,7 @@ export default class Weapon {
         bulletSpeed,
         bulletScale,
         bulletLifetime,
+        bulletDamage,
         velocityInheritanceFactor: this.config.velocityInheritanceFactor || 0
       });
     } else {
@@ -73,6 +75,7 @@ export default class Weapon {
           bulletSpeed,
           bulletScale,
           bulletLifetime,
+          bulletDamage,
           velocityInheritanceFactor: this.config.velocityInheritanceFactor || 0
         });
       }

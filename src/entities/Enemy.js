@@ -48,6 +48,16 @@ export default class Enemy {
       this.sprite.play(animKey);
     }
 
+    // Set health based on enemy type (worm: 50, crab: 100, angler: 150)
+    this.maxHealth = 50;
+    if (texture === "crab") {
+      this.maxHealth = 100;
+    } else if (texture === "angler") {
+      this.maxHealth = 150;
+    }
+    this.health = this.maxHealth;
+    this.isDead = false;
+
     // Attach memory leak protection event on destroy
     this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
@@ -99,6 +109,48 @@ export default class Enemy {
       }
     }
     return null;
+  }
+
+  /**
+   * Applies damage to the enemy.
+   * @param {number} amount Damage quantity
+   */
+  takeDamage(amount) {
+    if (this.isDead) return;
+    this.health -= amount;
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  /**
+   * Handles enemy death, including lists splicing, explosions, and pickups.
+   */
+  die() {
+    if (this.isDead) return;
+    this.isDead = true;
+
+    const scene = this.scene;
+    const index = scene.enemies.findIndex((e) => e === this);
+    if (index !== -1) {
+      scene.enemies.splice(index, 1);
+    }
+
+    if (this.sprite && this.sprite.active) {
+      const deathX = this.sprite.x;
+      const deathY = this.sprite.y;
+
+      if (typeof scene.spawnEnemyExplosion === "function") {
+        scene.spawnEnemyExplosion(deathX, deathY);
+      }
+
+      const gunId = this.dropGunId();
+      if (gunId && scene.weaponDropManager) {
+        scene.weaponDropManager.spawnPickup(deathX, deathY, gunId);
+      }
+
+      this.sprite.destroy();
+    }
   }
 
   /**

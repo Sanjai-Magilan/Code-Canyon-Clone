@@ -90,7 +90,8 @@ export default class ProjectileManager {
         info.bulletScale,
         info.bulletLifetime,
         parentVelocity,
-        info.velocityInheritanceFactor
+        info.velocityInheritanceFactor,
+        info.bulletDamage
       );
     }
   }
@@ -133,29 +134,71 @@ export default class ProjectileManager {
    * @param {Phaser.Physics.Arcade.Sprite} enemySprite The enemy sprite
    */
   handleBulletEnemyCollision(bullet, enemySprite) {
+    if (!enemySprite || !enemySprite.active) {
+      bullet.deactivate();
+      return;
+    }
+
+    const damage = bullet.damage !== undefined ? bullet.damage : 50;
     bullet.deactivate(); // Recycle bullet to the pool
 
-    // Find and destroy the corresponding Enemy class wrapper
+    if (bullet.texture && bullet.texture.key === "bullet_gun5") {
+      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage);
+      return;
+    }
+
+    // Find and apply damage to the corresponding Enemy class wrapper
     const scene = this.scene;
     const index = scene.enemies.findIndex((e) => e.sprite === enemySprite);
     if (index !== -1) {
       const enemy = scene.enemies[index];
-      scene.enemies.splice(index, 1);
-      
-      // Spawn death explosion at enemy position
-      if (typeof scene.spawnEnemyExplosion === "function") {
-        scene.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
-      }
-      
-      // Roll and spawn weapon drop if successful
-      if (typeof enemy.dropGunId === "function") {
-        const gunId = enemy.dropGunId();
-        if (gunId && scene.weaponDropManager) {
-          scene.weaponDropManager.spawnPickup(enemySprite.x, enemySprite.y, gunId);
+      if (typeof enemy.takeDamage === "function") {
+        enemy.takeDamage(damage);
+      } else {
+        enemy.health -= damage;
+        if (enemy.health <= 0) {
+          enemy.die();
         }
       }
-      
-      enemy.sprite.destroy(); // Triggers destroy callback for shadow cleanup
+    }
+  }
+
+  /**
+   * Applies area-of-effect explosion damage in a radius.
+   * @param {number} x X coordinate of explosion
+   * @param {number} y Y coordinate of explosion
+   * @param {number} damage Damage value to apply
+   */
+  triggerExplosionDamage(x, y, damage) {
+    try {
+      const radius = 150; // Big diameter of 300px
+      const scene = this.scene;
+
+      // Visual explosion effect
+      if (typeof scene.spawnEnemyExplosion === "function") {
+        scene.spawnEnemyExplosion(x, y);
+      }
+
+      // Clone enemies array to prevent modifications during iteration
+      const targets = [...scene.enemies];
+      for (let i = 0; i < targets.length; i++) {
+        const enemy = targets[i];
+        if (!enemy || !enemy.sprite || !enemy.sprite.active) continue;
+
+        const dist = Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y);
+        if (dist <= radius) {
+          if (typeof enemy.takeDamage === "function") {
+            enemy.takeDamage(damage);
+          } else {
+            enemy.health -= damage;
+            if (enemy.health <= 0) {
+              enemy.die();
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("CRITICAL EXPLOSION ERROR:", err);
     }
   }
 }
