@@ -8,6 +8,7 @@ import bgmAudio from "../assets/Sounds/bgm/musicBg.webm";
 import shootAudio from "../assets/Sounds/guns/shoot0.webm";
 import recoilAudio from "../assets/Sounds/reload/reload.webm";
 import crabShootAudio from "../assets/Sounds/enemy shoot/crabShoot.webm";
+import enemyDieAudio from "../assets/Sounds/enemy die/explode.webm";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -75,6 +76,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("shoot", shootAudio);
     this.load.audio("recoil", recoilAudio);
     this.load.audio("crab-shoot", crabShootAudio);
+    this.load.audio("enemy-die", enemyDieAudio);
   }
 
   create() {
@@ -320,6 +322,9 @@ export default class GameScene extends Phaser.Scene {
     explosion.setScale(0.5);
     explosion.setDepth(y + 10);
     explosion.play("enemy-explosion");
+
+    // Play enemy death sound effect
+    this.sound.play("enemy-die", { volume: 0.35 });
 
     explosion.once("animationcomplete", () => {
       explosion.destroy();
