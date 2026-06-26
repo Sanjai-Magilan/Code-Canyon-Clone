@@ -7,6 +7,7 @@ import anglerRun from "../assets/Sprites/Enemy/enemy 3/enangler-run-sheet.png";
 import bgmAudio from "../assets/Sounds/bgm/musicBg.webm";
 import shootAudio from "../assets/Sounds/guns/shoot0.webm";
 import recoilAudio from "../assets/Sounds/reload/reload.webm";
+import crabShootAudio from "../assets/Sounds/enemy shoot/crabShoot.webm";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -73,6 +74,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("bgm", bgmAudio);
     this.load.audio("shoot", shootAudio);
     this.load.audio("recoil", recoilAudio);
+    this.load.audio("crab-shoot", crabShootAudio);
   }
 
   create() {

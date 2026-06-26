@@ -7,9 +7,10 @@ const CRAB_CONFIG = Object.freeze({
   damage: 10,          // health damage on player hit
   fireRange: 800,      // maximum firing range
   yAlignmentTolerance: 40, // max vertical offset to align shot
-  projectileLifetime: 3000, // milliseconds before bullet despawns
+  projectileLifetime: 4000, // milliseconds before bullet despawns
   scale: 0.8,
   depth: 10,
+  shootSound: "crab-shoot",
   shadow: Object.freeze({
     offsetX: 0,
     offsetY: 40,

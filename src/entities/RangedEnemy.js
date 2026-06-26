@@ -34,6 +34,9 @@ export default class RangedEnemy extends Enemy {
     // Equip the ranged enemy with its custom weapon
     this.weapon = new Weapon(scene, this, rangedConfig.weaponKey);
 
+    // Store shooting sound key if provided
+    this.shootSoundKey = rangedConfig.shootSound;
+
     // Track active shooting state to halt movement
     this.isShooting = false;
   }
@@ -126,8 +129,13 @@ export default class RangedEnemy extends Enemy {
     const muzzlePosition = { x: this.sprite.x + offsetX, y: this.sprite.y + 35 };
 
     const shots = this.weapon.fire(muzzlePosition, fireAngle);
-    if (shots && this.scene.projectileManager) {
-      this.scene.projectileManager.spawn(shots, true); // isEnemy = true
+    if (shots) {
+      if (this.shootSoundKey) {
+        this.scene.sound.play(this.shootSoundKey, { volume: 0.4 });
+      }
+      if (this.scene.projectileManager) {
+        this.scene.projectileManager.spawn(shots, true); // isEnemy = true
+      }
     }
   }
 }
