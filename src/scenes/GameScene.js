@@ -10,6 +10,7 @@ import recoilAudio from "../assets/Sounds/reload/reload.webm";
 import crabShootAudio from "../assets/Sounds/enemy shoot/crabShoot.webm";
 import enemyDieAudio from "../assets/Sounds/enemy die/explode.webm";
 import playerOofAudio from "../assets/Sounds/player/playerOof.webm";
+import waveCompletedAudio from "../assets/Sounds/level completed/levelCompleted.webm";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -79,6 +80,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("crab-shoot", crabShootAudio);
     this.load.audio("enemy-die", enemyDieAudio);
     this.load.audio("player-oof", playerOofAudio);
+    this.load.audio("wave-completed", waveCompletedAudio);
   }
 
   create() {
@@ -155,6 +157,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Initialize the WaveManager system to handle wave configurations and timer scaling
     this.waveManager = new WaveManager(this);
+    this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
 
     const CELL_WIDTH = WORLD_CONFIG.grid.cellWidth;
     const CELL_HEIGHT = WORLD_CONFIG.grid.cellHeight;
@@ -264,6 +267,13 @@ export default class GameScene extends Phaser.Scene {
       // Dynamically adjust spawn delay based on current wave configuration
       if (this.spawnTimerEvent) {
         this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
+      }
+
+      // Check if a wave has completed (transitioned to a new wave ID)
+      const activeWaveConfig = this.waveManager.getCurrentWaveConfig();
+      if (activeWaveConfig && activeWaveConfig.id !== this.currentWaveId) {
+        this.sound.play("wave-completed", { volume: 0.5 });
+        this.currentWaveId = activeWaveConfig.id;
       }
 
       const playerSprite = this.player.getSprite();
