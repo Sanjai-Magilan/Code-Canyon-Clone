@@ -31,6 +31,27 @@ import gunfireSheet from "../assets/Sprites/Guns/gun-fire/gunfire_sheet copy.png
 import bullet from "../assets/Sprites/Guns/gun0/bullet.png";
 import ProjectileManager from "../systems/ProjectileManager";
 import PlayerShadow from "../assets/Sprites/Player/player-animation 1-000.png";
+import WeaponDropManager from "../systems/WeaponDropManager";
+
+import gunDrop1 from "../assets/Sprites/Guns/guns drop/gun-001.png";
+import gunDrop2 from "../assets/Sprites/Guns/guns drop/gun-002.png";
+import gunDrop3 from "../assets/Sprites/Guns/guns drop/gun-003.png";
+import gunDrop4 from "../assets/Sprites/Guns/guns drop/gun-004.png";
+import gunDrop5 from "../assets/Sprites/Guns/guns drop/gun-005.png";
+
+import gunSkin1 from "../assets/Sprites/Guns/player gun/playergun-gun-001.png";
+import gunSkin2 from "../assets/Sprites/Guns/player gun/playergun-gun-002.png";
+import gunSkin3 from "../assets/Sprites/Guns/player gun/playergun-gun-003.png";
+import gunSkin4 from "../assets/Sprites/Guns/player gun/playergun-gun-004.png";
+import gunSkin5 from "../assets/Sprites/Guns/player gun/playergun-gun-005.png";
+
+import powerUpAudio from "../assets/Sounds/powerUp.webm";
+
+import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
+import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
+import bulletSkin3 from "../assets/Sprites/Guns/bullet/bulletskin-0-003.png";
+import bulletSkin4 from "../assets/Sprites/Guns/bullet/bulletskin-0-004.png";
+import bulletSkin5 from "../assets/Sprites/Guns/bullet/bulletskin-0-005.png";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -82,6 +103,28 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("enemy-die", enemyDieAudio);
     this.load.audio("player-oof", playerOofAudio);
     this.load.audio("wave-completed", waveCompletedAudio);
+
+    // Preload weapon drops and skins
+    this.load.image("drop_gun1", gunDrop1);
+    this.load.image("drop_gun2", gunDrop2);
+    this.load.image("drop_gun3", gunDrop3);
+    this.load.image("drop_gun4", gunDrop4);
+    this.load.image("drop_gun5", gunDrop5);
+
+    this.load.image("skin_gun1", gunSkin1);
+    this.load.image("skin_gun2", gunSkin2);
+    this.load.image("skin_gun3", gunSkin3);
+    this.load.image("skin_gun4", gunSkin4);
+    this.load.image("skin_gun5", gunSkin5);
+
+    // Preload custom bullet skins
+    this.load.image("bullet_gun1", bulletSkin1);
+    this.load.image("bullet_gun2", bulletSkin2);
+    this.load.image("bullet_gun3", bulletSkin3);
+    this.load.image("bullet_gun4", bulletSkin4);
+    this.load.image("bullet_gun5", bulletSkin5);
+
+    this.load.audio("power-up", powerUpAudio);
   }
 
   create() {
@@ -169,6 +212,9 @@ export default class GameScene extends Phaser.Scene {
     // Initialize the WaveManager system to handle wave configurations and timer scaling
     this.waveManager = new WaveManager(this);
     this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
+
+    // Initialize the WeaponDropManager system to handle ground pickups
+    this.weaponDropManager = new WeaponDropManager(this);
 
     const CELL_WIDTH = WORLD_CONFIG.grid.cellWidth;
     const CELL_HEIGHT = WORLD_CONFIG.grid.cellHeight;
@@ -461,6 +507,15 @@ export default class GameScene extends Phaser.Scene {
       this.enemies.splice(index, 1);
       
       this.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
+
+      // Roll and spawn weapon drop if successful
+      if (typeof enemy.dropGunId === "function") {
+        const gunId = enemy.dropGunId();
+        if (gunId && this.weaponDropManager) {
+          this.weaponDropManager.spawnPickup(enemySprite.x, enemySprite.y, gunId);
+        }
+      }
+
       enemy.sprite.destroy(); // Properly destroys sprite and hooks shadow cleanup
     }
   }

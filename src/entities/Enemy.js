@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import ENEMY_CONFIG from "../config/enemyConfig";
+import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 
 export default class Enemy {
   /**
@@ -81,6 +82,23 @@ export default class Enemy {
     this.shadow.x = this.sprite.x + shadowOffsetX;
     this.shadow.y = this.sprite.y + this.shadowConfig.updateOffsetY;
     this.shadow.setFlipX(movingLeft);
+  }
+
+  /**
+   * Rolls a drop gun ID based on enemy type configuration.
+   * @returns {string|null} The rolled weapon ID, or null
+   */
+  dropGunId() {
+    const enemyType = this.sprite.texture.key;
+    const dropConfig = WEAPON_DROP_CONFIG[enemyType];
+    if (!dropConfig) return null;
+
+    for (const [gunId, chance] of Object.entries(dropConfig)) {
+      if (Math.random() < chance) {
+        return gunId;
+      }
+    }
+    return null;
   }
 
   /**

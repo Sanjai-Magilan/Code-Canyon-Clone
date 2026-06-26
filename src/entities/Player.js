@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import Weapon from "./Weapon";
 import CHARACTERS from "../config/characterConfig";
+import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 
 export default class Player {
   /**
@@ -39,6 +40,12 @@ export default class Player {
 
     // Instantiate weapon automatically based on character configuration
     this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
+
+    // --- Temporary Weapon System State ---
+    this.tempWeaponId = null;
+    this.tempWeaponMaxShots = null;
+    this.tempWeaponShotsFired = 0;
+    this.tempWeaponTimer = null;
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -237,6 +244,11 @@ export default class Player {
    * to avoid memory leaks.
    */
   destroy() {
+    if (this.tempWeaponTimer) {
+      this.tempWeaponTimer.remove();
+      this.tempWeaponTimer = null;
+    }
+
     if (this.scene && this.scene.events) {
       this.scene.events.off(
         Phaser.Scenes.Events.POST_UPDATE,
@@ -333,6 +345,17 @@ export default class Player {
       return;
     }
 
+    // Check shot count limit for temporary weapons
+    if (this.tempWeaponMaxShots !== null) {
+      this.tempWeaponShotsFired++;
+      if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
+        this.scene.time.delayedCall(0, () => {
+          this.revertToDefaultWeapon();
+          this.showFeedbackText("Weapon Expired", "#ff4444");
+        });
+      }
+    }
+
     // Play gun shoot sound effect
     this.scene.sound.play("shoot", { volume: 0.4 });
 
@@ -369,6 +392,102 @@ export default class Player {
       flashSprite.destroy();
       if (this.flash === flashSprite) {
         this.flash = null;
+      }
+    });
+  }
+
+  /**
+   * Equips a temporary weapon.
+   * @param {string} gunId The weapon ID to equip (e.g. 'gun1')
+   */
+  equipTemporaryWeapon(gunId) {
+    // Clear any existing expiration timers
+    if (this.tempWeaponTimer) {
+      this.tempWeaponTimer.remove();
+      this.tempWeaponTimer = null;
+    }
+
+    this.tempWeaponId = gunId;
+    this.tempWeaponShotsFired = 0;
+
+    // Configure limits based on weapon drop config
+    const maxShotsConfig = WEAPON_DROP_CONFIG.maxShots[gunId];
+    this.tempWeaponMaxShots = maxShotsConfig !== undefined ? maxShotsConfig : null;
+
+    const duration = WEAPON_DROP_CONFIG.durations[gunId];
+    if (duration) {
+      this.tempWeaponTimer = this.scene.time.delayedCall(
+        duration,
+        () => {
+          this.revertToDefaultWeapon();
+          this.showFeedbackText("Weapon Expired", "#ff4444");
+        },
+        [],
+        this
+      );
+    }
+
+    // Set the equipped skin image key (preloaded as skin_gunId)
+    this.gun.setTexture(`skin_${gunId}`);
+
+    // Re-create the Weapon instance using the temporary config key
+    this.weapon = new Weapon(this.scene, this, gunId);
+
+    // Visual feedback text above player
+    const formattedName = gunId.toUpperCase();
+    this.showFeedbackText(formattedName, "#44ff44");
+
+    // Optional audio hook (power-up pickup sound)
+    this.scene.sound.play("power-up", { volume: 0.5 });
+  }
+
+  /**
+   * Reverts the temporary weapon back to the player's default weapon.
+   */
+  revertToDefaultWeapon() {
+    if (this.tempWeaponTimer) {
+      this.tempWeaponTimer.remove();
+      this.tempWeaponTimer = null;
+    }
+
+    this.tempWeaponId = null;
+    this.tempWeaponMaxShots = null;
+    this.tempWeaponShotsFired = 0;
+
+    // Restore default skin and weapon configuration
+    this.gun.setTexture(this.characterConfig.gunTexture);
+    this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
+  }
+
+  /**
+   * Spawns a floating feedback text above the player.
+   * @param {string} text The text to display
+   * @param {string} color The hex color code
+   */
+  showFeedbackText(text, color = "#ffffff") {
+    const feedback = this.scene.add.text(
+      this.sprite.x,
+      this.sprite.y - 80,
+      text,
+      {
+        fontSize: "20px",
+        fontFamily: "Arial",
+        color: color,
+        stroke: "#000000",
+        strokeThickness: 4,
+        align: "center"
+      }
+    );
+    feedback.setOrigin(0.5);
+    feedback.setDepth(this.sprite.depth + 10);
+
+    this.scene.tweens.add({
+      targets: feedback,
+      y: feedback.y - 40,
+      alpha: 0,
+      duration: 1200,
+      onComplete: () => {
+        feedback.destroy();
       }
     });
   }

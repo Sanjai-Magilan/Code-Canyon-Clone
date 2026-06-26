@@ -79,6 +79,9 @@ export default class ProjectileManager {
     // Set the texture dynamically when getting the bullet from the pool
     const bullet = group.get(info.x, info.y, info.bulletTexture);
     if (bullet) {
+      if (info.bulletTexture) {
+        bullet.setTexture(info.bulletTexture);
+      }
       bullet.fire(
         info.x,
         info.y,
@@ -142,6 +145,14 @@ export default class ProjectileManager {
       // Spawn death explosion at enemy position
       if (typeof scene.spawnEnemyExplosion === "function") {
         scene.spawnEnemyExplosion(enemySprite.x, enemySprite.y);
+      }
+      
+      // Roll and spawn weapon drop if successful
+      if (typeof enemy.dropGunId === "function") {
+        const gunId = enemy.dropGunId();
+        if (gunId && scene.weaponDropManager) {
+          scene.weaponDropManager.spawnPickup(enemySprite.x, enemySprite.y, gunId);
+        }
       }
       
       enemy.sprite.destroy(); // Triggers destroy callback for shadow cleanup
