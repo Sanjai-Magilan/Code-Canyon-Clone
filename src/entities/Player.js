@@ -358,6 +358,9 @@ export default class Player {
     this.recoilOffset = recoilConfig.offset;
     this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;
 
+    // Play gun recoil/reload sound
+    this.scene.sound.play("recoil", { volume: 0.3 });
+
     flashSprite.once("animationcomplete", () => {
       flashSprite.destroy();
       if (this.flash === flashSprite) {
