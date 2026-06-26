@@ -273,6 +273,9 @@ export default class Player {
    * @param {number} amount Damage amount
    */
   takeDamage(amount) {
+    // Play hit sound effect
+    this.scene.sound.play("player-oof", { volume: 0.3 });
+
     // Infinite health for dev purposes (ignore all incoming damage)
     return;
   }
