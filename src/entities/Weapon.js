@@ -58,7 +58,8 @@ export default class Weapon {
         bulletTexture,
         bulletSpeed,
         bulletScale,
-        bulletLifetime
+        bulletLifetime,
+        velocityInheritanceFactor: this.config.velocityInheritanceFactor || 0
       });
     } else {
       // For multi-bullet weapons (like shotgun), distribute them evenly across the spread range
@@ -71,7 +72,8 @@ export default class Weapon {
           bulletTexture,
           bulletSpeed,
           bulletScale,
-          bulletLifetime
+          bulletLifetime,
+          velocityInheritanceFactor: this.config.velocityInheritanceFactor || 0
         });
       }
     }

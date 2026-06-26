@@ -16,8 +16,11 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    * @param {number} angle Radian angle of trajectory
    * @param {number} speed Trajectory velocity speed
    * @param {number} scale Image sprite scale multiplier
+   * @param {number|null} lifetime Projectile lifetime in ms
+   * @param {object|null} parentVelocity Owner velocity to inherit
+   * @param {number} inheritanceFactor Proportion of owner velocity to inherit (0.0 to 1.0)
    */
-  fire(x, y, angle, speed = this.speed, scale = null, lifetime = null) {
+  fire(x, y, angle, speed = this.speed, scale = null, lifetime = null, parentVelocity = null, inheritanceFactor = 0) {
     // Re-enable the physics body and make the bullet active and visible
     this.enableBody(true, x, y, true, true);
     
@@ -26,8 +29,15 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
     }
     
     // Set physics velocity based on the radian angle and speed
-    const vx = Math.cos(angle) * speed;
-    const vy = Math.sin(angle) * speed;
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed;
+
+    // Apply parent velocity inheritance if configured
+    if (parentVelocity && inheritanceFactor > 0) {
+      vx += parentVelocity.x * inheritanceFactor;
+      vy += parentVelocity.y * inheritanceFactor;
+    }
+
     this.setVelocity(vx, vy);
     
     // Align sprite orientation with velocity direction

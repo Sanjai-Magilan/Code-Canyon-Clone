@@ -11,6 +11,7 @@ import crabShootAudio from "../assets/Sounds/enemy shoot/crabShoot.webm";
 import enemyDieAudio from "../assets/Sounds/enemy die/explode.webm";
 import playerOofAudio from "../assets/Sounds/player/playerOof.webm";
 import waveCompletedAudio from "../assets/Sounds/level completed/levelCompleted.webm";
+import CAMERA_CONFIG from "../config/cameraConfig";
 import WORLD_CONFIG from "../config/worldConfig";
 import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
@@ -96,7 +97,17 @@ export default class GameScene extends Phaser.Scene {
     this.player = new Player(this, worldWidth / 2, worldHeight / 2, "soldier");
     this.playerHP = this.player.maxHealth;
 
-    this.cameras.main.startFollow(this.player.getSprite());
+    // Setup camera follow with lerping/smoothing and deadzone configurations
+    this.cameras.main.startFollow(
+      this.player.getSprite(),
+      true, // Round pixels to prevent sub-pixel rendering jitter
+      CAMERA_CONFIG.lerpX,
+      CAMERA_CONFIG.lerpY
+    );
+
+    if (CAMERA_CONFIG.deadzoneWidth > 0 && CAMERA_CONFIG.deadzoneHeight > 0) {
+      this.cameras.main.setDeadzone(CAMERA_CONFIG.deadzoneWidth, CAMERA_CONFIG.deadzoneHeight);
+    }
     this.cursors = this.input.keyboard.createCursorKeys();
 
     // Create static physics group for the stones (obstacles)
@@ -277,6 +288,29 @@ export default class GameScene extends Phaser.Scene {
       }
 
       const playerSprite = this.player.getSprite();
+
+      // Camera Look-Ahead System based on player body velocity
+      if (playerSprite && playerSprite.body) {
+        const playerVelX = playerSprite.body.velocity.x;
+        const playerVelY = playerSprite.body.velocity.y;
+        const playerSpeed = this.player.speed || 240;
+
+        // Calculate target offset (inverted because followOffset shifts view opposite to focus)
+        const targetOffsetX = -(playerVelX / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
+        const targetOffsetY = -(playerVelY / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
+
+        // Smoothly interpolate the camera's followOffset towards the target offset
+        this.cameras.main.followOffset.x = Phaser.Math.Linear(
+          this.cameras.main.followOffset.x,
+          targetOffsetX,
+          CAMERA_CONFIG.lookAheadSmoothness
+        );
+        this.cameras.main.followOffset.y = Phaser.Math.Linear(
+          this.cameras.main.followOffset.y,
+          targetOffsetY,
+          CAMERA_CONFIG.lookAheadSmoothness
+        );
+      }
 
       // Update enemy AI behaviors (pathfinding/velocity update)
       for (const enemy of this.enemies) {

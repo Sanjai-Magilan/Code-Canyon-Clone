@@ -338,7 +338,8 @@ export default class Player {
 
     // Hand off projectile spawning to the scene's ProjectileManager
     if (this.scene.projectileManager) {
-      this.scene.projectileManager.spawn(shotInfo);
+      const parentVel = this.sprite.body ? { x: this.sprite.body.velocity.x, y: this.sprite.body.velocity.y } : { x: 0, y: 0 };
+      this.scene.projectileManager.spawn(shotInfo, false, parentVel);
     }
 
     // Render visual effects and muzzle flash

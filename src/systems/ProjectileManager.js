@@ -55,14 +55,15 @@ export default class ProjectileManager {
    * Spawns/recycles projectiles. Supports both a single shot info object or an array of them.
    * @param {object|object[]} shotData Coordinate and angle data
    * @param {boolean} isEnemy True if spawned by an enemy unit
+   * @param {object|null} parentVelocity Velocity vector of the parent entity
    */
-  spawn(shotData, isEnemy = false) {
+  spawn(shotData, isEnemy = false, parentVelocity = null) {
     if (Array.isArray(shotData)) {
       for (let i = 0; i < shotData.length; i++) {
-        this.spawnSingle(shotData[i], isEnemy);
+        this.spawnSingle(shotData[i], isEnemy, parentVelocity);
       }
     } else if (shotData) {
-      this.spawnSingle(shotData, isEnemy);
+      this.spawnSingle(shotData, isEnemy, parentVelocity);
     }
   }
 
@@ -70,9 +71,10 @@ export default class ProjectileManager {
    * Spawns/recycles a single projectile.
    * @param {object} info Shot info containing x, y, angle, bulletTexture, bulletSpeed, and bulletScale
    * @param {boolean} isEnemy True if spawned by an enemy unit
+   * @param {object|null} parentVelocity Velocity vector of the parent entity
    * @private
    */
-  spawnSingle(info, isEnemy) {
+  spawnSingle(info, isEnemy, parentVelocity) {
     const group = isEnemy ? this.enemyBullets : this.bullets;
     // Set the texture dynamically when getting the bullet from the pool
     const bullet = group.get(info.x, info.y, info.bulletTexture);
@@ -83,7 +85,9 @@ export default class ProjectileManager {
         info.angle,
         info.bulletSpeed,
         info.bulletScale,
-        info.bulletLifetime
+        info.bulletLifetime,
+        parentVelocity,
+        info.velocityInheritanceFactor
       );
     }
   }
