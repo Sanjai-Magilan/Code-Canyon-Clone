@@ -221,6 +221,7 @@ export default class GameScene extends Phaser.Scene {
     // Initialize the WaveManager system to handle wave configurations and timer scaling
     this.waveManager = new WaveManager(this);
     this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
+    this.showWavePopup(this.currentWaveId);
 
     // Initialize the WeaponDropManager system to handle ground pickups
     this.weaponDropManager = new WeaponDropManager(this);
@@ -358,6 +359,7 @@ export default class GameScene extends Phaser.Scene {
       if (activeWaveConfig && activeWaveConfig.id !== this.currentWaveId) {
         this.sound.play("wave-completed", { volume: 0.5 });
         this.currentWaveId = activeWaveConfig.id;
+        this.showWavePopup(activeWaveConfig.id);
       }
 
       const playerSprite = this.player.getSprite();
@@ -558,5 +560,55 @@ export default class GameScene extends Phaser.Scene {
     const clampedHearts = Phaser.Math.Clamp(Math.floor(currentHearts), 0, 9);
 
     this.heartCountSprite.setFrame(52 + clampedHearts);
+  }
+
+  /**
+   * Spawns a floating retro font pop-up overlay announcing a new wave.
+   * @param {number} waveNumber The new wave ID
+   */
+  showWavePopup(waveNumber) {
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+
+    const popupSprites = [];
+    const chars = [
+      { frame: 22, offsetX: -120 }, // W
+      { frame: 0,  offsetX: -65  }, // A
+      { frame: 21, offsetX: -15  }, // V
+      { frame: 4,  offsetX: 35   }, // E
+      { frame: 52 + waveNumber, offsetX: 110 } // Digit character
+    ];
+
+    chars.forEach(char => {
+      const sprite = this.add.sprite(centerX + char.offsetX, centerY, "hud-font");
+      sprite.setFrame(char.frame);
+      sprite.setScale(0.1);
+      sprite.setScrollFactor(0);
+      sprite.setDepth(200000); // Float above EVERYTHING
+      sprite.setAlpha(0);
+      popupSprites.push(sprite);
+    });
+
+    this.tweens.add({
+      targets: popupSprites,
+      alpha: 1,
+      scale: 0.5,
+      duration: 400,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        this.time.delayedCall(1200, () => {
+          this.tweens.add({
+            targets: popupSprites,
+            alpha: 0,
+            y: centerY - 50,
+            duration: 400,
+            ease: "Power2.easeIn",
+            onComplete: () => {
+              popupSprites.forEach(s => s.destroy());
+            }
+          });
+        });
+      }
+    });
   }
 }
