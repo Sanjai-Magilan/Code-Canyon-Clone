@@ -52,6 +52,7 @@ export default class Player {
     this.isInvincible = false;
     this.invincibilityTimer = null;
     this.blinkTimer = null;
+    this.isDead = false;
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -135,7 +136,7 @@ export default class Player {
    * @param {Phaser.Types.Input.Keyboard.CursorKeys} cursors Keyboard cursors object
    */
   update(cursors) {
-    if (!this.sprite.body) return;
+    if (this.isDead || !this.sprite.body) return;
 
     // Reset velocity on every update cycle
     this.sprite.setVelocity(0);
@@ -334,13 +335,33 @@ export default class Player {
    * Handle player death sequence
    */
   die() {
+    if (this.isDead) return;
+    this.isDead = true;
+
     console.log("Player died!");
     this.clearInvincibilityTimers();
     this.setPlayerAlpha(1.0);
+
+    // Stop movement and disable physics body
+    if (this.sprite.body) {
+      this.sprite.setVelocity(0, 0);
+    }
     this.sprite.disableBody(true, true);
     if (this.head) this.head.setVisible(false);
     if (this.gun) this.gun.setVisible(false);
     if (this.shadow) this.shadow.setVisible(false);
+
+    // Shake camera slightly
+    if (this.scene && this.scene.cameras && this.scene.cameras.main) {
+      this.scene.cameras.main.shake(300, 0.02);
+    }
+
+    // Restart the scene after 1000ms delay
+    if (this.scene && this.scene.time) {
+      this.scene.time.delayedCall(1000, () => {
+        this.scene.scene.restart();
+      });
+    }
   }
 
   /**
@@ -430,6 +451,7 @@ export default class Player {
   }
 
   shoot() {
+    if (this.isDead) return;
     const muzzle = this.getMuzzlePosition();
 
     // Delegate cooldown check and get spawn parameters

@@ -52,6 +52,13 @@ export default class WaveManager {
       }
     ];
 
+    this.startTime = null;
+  }
+
+  /**
+   * Starts the wave clock.
+   */
+  start() {
     this.startTime = this.scene.time.now;
   }
 
@@ -59,7 +66,7 @@ export default class WaveManager {
    * Resets the wave clock.
    */
   reset() {
-    this.startTime = this.scene.time.now;
+    this.start();
   }
 
   /**
@@ -67,6 +74,9 @@ export default class WaveManager {
    * @returns {number}
    */
   getElapsedTime() {
+    if (this.startTime === null) {
+      return 0;
+    }
     return this.scene.time.now - this.startTime;
   }
 

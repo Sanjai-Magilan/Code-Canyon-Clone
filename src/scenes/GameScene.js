@@ -220,6 +220,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Initialize the WaveManager system to handle wave configurations and timer scaling
     this.waveManager = new WaveManager(this);
+    this.waveManager.start();
     this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
     this.showWavePopup(this.currentWaveId);
 
