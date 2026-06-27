@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import Weapon from "./Weapon";
 import CHARACTERS from "../config/characterConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
+import PLAYER_CONFIG from "../config/playerConfig";
 
 export default class Player {
   /**
@@ -20,8 +21,8 @@ export default class Player {
 
     // --- Character Stats ---
     this.speed = this.characterConfig.speed;
-    this.health = this.characterConfig.maxHealth;
-    this.maxHealth = this.characterConfig.maxHealth;
+    this.health = PLAYER_CONFIG.maxHealth;
+    this.maxHealth = PLAYER_CONFIG.maxHealth;
 
     // --- Visual Offsets & Recoil Parameters ---
     this.headOffset = this.characterConfig.headOffset;
@@ -46,6 +47,11 @@ export default class Player {
     this.tempWeaponMaxShots = null;
     this.tempWeaponShotsFired = 0;
     this.tempWeaponTimer = null;
+    this.lastHitTime = -Infinity;
+    this.invincibilityDuration = PLAYER_CONFIG.invincibilityDuration;
+    this.isInvincible = false;
+    this.invincibilityTimer = null;
+    this.blinkTimer = null;
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -244,6 +250,8 @@ export default class Player {
    * to avoid memory leaks.
    */
   destroy() {
+    this.clearInvincibilityTimers();
+
     if (this.tempWeaponTimer) {
       this.tempWeaponTimer.remove();
       this.tempWeaponTimer = null;
@@ -280,16 +288,34 @@ export default class Player {
     }
   }
 
-  /**
-   * Apply damage to the player
-   * @param {number} amount Damage amount
-   */
   takeDamage(amount) {
+    console.trace("takeDamage called");
+
+    if (this.isInvincible) {
+      console.log("Damage ignored due to iFrames");
+      return;
+    }
+
     // Play hit sound effect
     this.scene.sound.play("player-oof", { volume: 0.3 });
 
-    // Infinite health for dev purposes (ignore all incoming damage)
-    return;
+    this.health = Math.max(0, this.health - 1);
+    console.trace("health changed");
+    console.log(
+      "Player hit",
+      this.health,
+      this.scene.time.now
+    );
+
+    if (this.scene && typeof this.scene.updateHearts === "function") {
+      this.scene.updateHearts();
+    }
+
+    if (this.health <= 0) {
+      this.die();
+    } else {
+      this.startInvincibility();
+    }
   }
 
   /**
@@ -298,6 +324,10 @@ export default class Player {
    */
   heal(amount) {
     this.health = Math.min(this.maxHealth, this.health + amount);
+    console.trace("health changed");
+    if (this.scene && typeof this.scene.updateHearts === "function") {
+      this.scene.updateHearts();
+    }
   }
 
   /**
@@ -305,10 +335,73 @@ export default class Player {
    */
   die() {
     console.log("Player died!");
+    this.clearInvincibilityTimers();
+    this.setPlayerAlpha(1.0);
     this.sprite.disableBody(true, true);
     if (this.head) this.head.setVisible(false);
     if (this.gun) this.gun.setVisible(false);
     if (this.shadow) this.shadow.setVisible(false);
+  }
+
+  /**
+   * Starts player invincibility and blinking feedback.
+   */
+  startInvincibility() {
+    this.clearInvincibilityTimers();
+
+    this.isInvincible = true;
+
+    let isAlphaLow = false;
+
+    // Start 100ms blink timer using Phaser time events
+    this.blinkTimer = this.scene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        isAlphaLow = !isAlphaLow;
+        this.setPlayerAlpha(isAlphaLow ? 0.3 : 1.0);
+      }
+    });
+
+    // Start invincibility duration timer using Phaser delayed call
+    this.invincibilityTimer = this.scene.time.delayedCall(this.invincibilityDuration, () => {
+      this.endInvincibility();
+    });
+  }
+
+  /**
+   * Ends player invincibility, stops timers, and restores alpha.
+   */
+  endInvincibility() {
+    this.isInvincible = false;
+    this.clearInvincibilityTimers();
+    this.setPlayerAlpha(1.0);
+  }
+
+  /**
+   * Sets the transparency alpha for all visual player attachment sprites.
+   * @param {number} alpha Opacity value between 0 and 1
+   */
+  setPlayerAlpha(alpha) {
+    if (this.sprite) this.sprite.setAlpha(alpha);
+    if (this.head) this.head.setAlpha(alpha);
+    if (this.gun) this.gun.setAlpha(alpha);
+    if (this.shadow) this.shadow.setAlpha(alpha);
+    if (this.flash) this.flash.setAlpha(alpha);
+  }
+
+  /**
+   * Cleans up active Phaser time events to prevent memory/timer leaks.
+   */
+  clearInvincibilityTimers() {
+    if (this.blinkTimer) {
+      this.blinkTimer.remove();
+      this.blinkTimer = null;
+    }
+    if (this.invincibilityTimer) {
+      this.invincibilityTimer.remove();
+      this.invincibilityTimer = null;
+    }
   }
 
   /**

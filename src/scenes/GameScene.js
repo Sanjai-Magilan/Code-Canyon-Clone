@@ -9,6 +9,7 @@ import shootAudio from "../assets/Sounds/guns/shoot0.webm";
 import recoilAudio from "../assets/Sounds/reload/reload.webm";
 import crabShootAudio from "../assets/Sounds/enemy shoot/crabShoot.webm";
 import enemyDieAudio from "../assets/Sounds/enemy die/explode.webm";
+import monsterDeathAudio from "../assets/Sounds/enemy die/monsterDeath.webm";
 import playerOofAudio from "../assets/Sounds/player/playerOof.webm";
 import waveCompletedAudio from "../assets/Sounds/level completed/levelCompleted.webm";
 import CAMERA_CONFIG from "../config/cameraConfig";
@@ -52,6 +53,8 @@ import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
 import bulletSkin3 from "../assets/Sprites/Guns/bullet/bulletskin-0-003.png";
 import bulletSkin4 from "../assets/Sprites/Guns/bullet/bulletskin-0-004.png";
 import bulletSkin5 from "../assets/Sprites/Guns/bullet/bulletskin-0-005.png";
+import healthBarImg from "../assets/Sprites/health/barholder-animation 1-001.png";
+import hudFontImg from "../assets/Sprites/font/fonth.png";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -101,6 +104,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("recoil", recoilAudio);
     this.load.audio("crab-shoot", crabShootAudio);
     this.load.audio("enemy-die", enemyDieAudio);
+    this.load.audio("monster-death", monsterDeathAudio);
     this.load.audio("player-oof", playerOofAudio);
     this.load.audio("wave-completed", waveCompletedAudio);
 
@@ -124,6 +128,11 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("bullet_gun4", bulletSkin4);
     this.load.image("bullet_gun5", bulletSkin5);
 
+    this.load.image("health-bar-holder", healthBarImg);
+    this.load.spritesheet("hud-font", hudFontImg, {
+      frameWidth: 165,
+      frameHeight: 157
+    });
     this.load.audio("power-up", powerUpAudio);
   }
 
@@ -312,6 +321,23 @@ export default class GameScene extends Phaser.Scene {
     });
     this.bgm.play();
 
+    // Create HUD Health Bar Holder
+    this.healthBarHolder = this.add.image(20, 20, "health-bar-holder");
+    this.healthBarHolder.setOrigin(0, 0);
+    this.healthBarHolder.setScrollFactor(0);
+    this.healthBarHolder.setDepth(100000);
+
+    // Centered Heart count digit sprite inside the health bar slot
+    this.heartCountSprite = this.add.sprite(196, 90, "hud-font");
+    this.heartCountSprite.setFrame(57); // '5'
+    this.heartCountSprite.setScale(0.3);
+    this.heartCountSprite.setScrollFactor(0);
+    this.heartCountSprite.setDepth(100001);
+
+    this.updateHearts();
+
+
+
     this.input.on("pointerdown", () => {
       this.player.shoot();
     });
@@ -320,6 +346,7 @@ export default class GameScene extends Phaser.Scene {
   update() {
     try {
       this.player.update(this.cursors);
+
 
       // Dynamically adjust spawn delay based on current wave configuration
       if (this.spawnTimerEvent) {
@@ -489,7 +516,8 @@ export default class GameScene extends Phaser.Scene {
     explosion.play("enemy-explosion");
 
     // Play enemy death sound effect
-    this.sound.play("enemy-die", { volume: 0.35 });
+    this.sound.play("enemy-die", { volume: 0.45 });
+    this.sound.play("monster-death", { volume: 0.35 });
 
     explosion.once("animationcomplete", () => {
       explosion.destroy();
@@ -506,5 +534,29 @@ export default class GameScene extends Phaser.Scene {
       const enemy = this.enemies[index];
       enemy.die();
     }
+  }
+
+  /**
+   * Redraws the HUD health bar heart count digit.
+   */
+  updateHearts() {
+    console.trace("updateHearts called");
+    if (!this.player || !this.heartCountSprite) return;
+
+    // Synchronize playerHP with the single source of truth player.health
+    this.playerHP = this.player.health;
+
+    // Log the current state comparison
+    console.log(
+      "Health:",
+      this.player.health,
+      "PlayerHP:",
+      this.playerHP
+    );
+
+    const currentHearts = this.player.health !== undefined ? this.player.health : 5;
+    const clampedHearts = Phaser.Math.Clamp(Math.floor(currentHearts), 0, 9);
+
+    this.heartCountSprite.setFrame(52 + clampedHearts);
   }
 }
