@@ -50,10 +50,13 @@ export default class Player {
     this.tempWeaponTimer = null;
     this.lastHitTime = -Infinity;
     this.invincibilityDuration = PLAYER_CONFIG.invincibilityDuration;
-    this.isInvincible = false;
-    this.invincibilityTimer = null;
-    this.blinkTimer = null;
     this.isDead = false;
+
+    // --- Shield State ---
+    this.hasShield = false;
+    this.shield = null;
+    this.shieldDirection = "right";
+    this.shieldHitsRemaining = 0;
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -245,6 +248,19 @@ export default class Player {
       this.flash.setPosition(muzzle.x, muzzle.y);
       this.flash.setFlipX(this.sprite.flipX);
     }
+
+    // Update shield position, rotation, and flip matching the player's facing direction
+    if (this.shield) {
+      this.shieldDirection = this.sprite.flipX ? "left" : "right";
+
+      const ox = this.sprite.flipX ? -50 : 50;
+      const oy = -10;
+
+      this.shield.setPosition(this.sprite.x + ox, this.sprite.y + oy);
+      this.shield.setFlipX(this.sprite.flipX);
+      this.shield.setRotation(0);
+      this.shield.setAlpha(this.sprite.alpha);
+    }
   }
 
   /**
@@ -256,6 +272,7 @@ export default class Player {
     this.isDestroyed = true;
     console.log("Player destroyed");
 
+    this.destroyShield();
     this.clearInvincibilityTimers();
 
     if (this.tempWeaponTimer) {
@@ -299,8 +316,32 @@ export default class Player {
     }
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, source = null) {
     console.trace("takeDamage called");
+
+    if (this.hasShield && source) {
+      const angleToSource = Phaser.Math.Angle.Between(
+        this.sprite.x,
+        this.sprite.y,
+        source.x,
+        source.y
+      );
+
+      let shieldAngle = 0;
+      switch (this.shieldDirection) {
+        case "right": shieldAngle = 0; break;
+        case "left": shieldAngle = Math.PI; break;
+        case "up": shieldAngle = -Math.PI / 2; break;
+        case "down": shieldAngle = Math.PI / 2; break;
+      }
+
+      const diff = Phaser.Math.Angle.Wrap(angleToSource - shieldAngle);
+
+      if (Math.abs(diff) <= Math.PI / 4) { // covers ±45 degrees
+        this.blockDamage();
+        return;
+      }
+    }
 
     if (this.isInvincible) {
       console.log("Damage ignored due to iFrames");
@@ -348,6 +389,8 @@ export default class Player {
     if (this.isDead) return;
     this.isDead = true;
 
+    this.destroyShield();
+
     console.log("Player died!");
     this.clearInvincibilityTimers();
     this.setPlayerAlpha(1.0);
@@ -371,6 +414,100 @@ export default class Player {
       this.scene.time.delayedCall(1000, () => {
         this.scene.scene.restart();
       });
+    }
+  }
+
+  /**
+   * Equips the directional shield and configures durability.
+   */
+  equipShield() {
+    if (this.hasShield) {
+      this.shieldHitsRemaining = 3;
+      return;
+    }
+
+    this.hasShield = true;
+    this.shieldHitsRemaining = 3;
+
+    // Create shield sprite attached to player
+    this.shield = this.scene.add.image(this.sprite.x, this.sprite.y, "shield-sprite");
+    this.shield.setScale(this.characterConfig.scale * 0.85);
+    this.shield.setDepth(this.sprite.depth + 1);
+  }
+
+  /**
+   * Destroys the shield and resets shield states.
+   */
+  destroyShield() {
+    this.hasShield = false;
+    this.shieldHitsRemaining = 0;
+    if (this.shield) {
+      this.shield.destroy();
+      this.shield = null;
+    }
+  }
+
+  /**
+   * Plays shield block visual shake, flash, and sound.
+   */
+  blockDamage() {
+    this.shieldHitsRemaining--;
+
+    if (this.scene) {
+      // Play blocking feedback audio
+      if (this.scene.sound) {
+        this.scene.sound.play("power-up", { volume: 0.3, pitch: 1.5 });
+      }
+
+      // Shake and flash shield
+      if (this.shield) {
+        this.scene.tweens.add({
+          targets: this.shield,
+          x: this.shield.x + Phaser.Math.Between(-6, 6),
+          y: this.shield.y + Phaser.Math.Between(-6, 6),
+          duration: 50,
+          yoyo: true,
+          repeat: 2
+        });
+
+        this.shield.setTint(0xffffff);
+        this.scene.time.delayedCall(100, () => {
+          if (this.shield) this.shield.clearTint();
+        });
+      }
+    }
+
+    if (this.shieldHitsRemaining <= 0) {
+      this.breakShield();
+    }
+  }
+
+  /**
+   * Breaks the shield and runs break fade animation.
+   */
+  breakShield() {
+    if (this.shield && this.scene) {
+      if (this.scene.sound) {
+        this.scene.sound.play("enemy-die", { volume: 0.5, pitch: 0.8 });
+      }
+
+      const breakingShield = this.shield;
+      this.shield = null;
+      this.hasShield = false;
+      this.shieldHitsRemaining = 0;
+
+      this.scene.tweens.add({
+        targets: breakingShield,
+        scale: breakingShield.scale * 1.5,
+        alpha: 0,
+        duration: 300,
+        ease: "Power2.easeOut",
+        onComplete: () => {
+          breakingShield.destroy();
+        }
+      });
+    } else {
+      this.destroyShield();
     }
   }
 

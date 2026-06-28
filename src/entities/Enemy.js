@@ -156,6 +156,21 @@ export default class Enemy {
             scene.spawnHealthPickup(deathX, deathY);
           }
         }
+        // Drop shield with 15% probability to allow immediate Wave 1 testing
+        if (Phaser.Math.Between(1, 100) <= 15) {
+          if (typeof scene.spawnShieldPickup === "function") {
+            scene.spawnShieldPickup(deathX, deathY);
+          }
+        }
+      }
+
+      // Only the Crab enemy can drop shields (with 20% probability)
+      if (this.sprite.texture.key === "crab") {
+        if (Phaser.Math.Between(1, 100) <= 20) {
+          if (typeof scene.spawnShieldPickup === "function") {
+            scene.spawnShieldPickup(deathX, deathY);
+          }
+        }
       }
 
       this.sprite.destroy();

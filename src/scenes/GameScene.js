@@ -49,6 +49,9 @@ import gunSkin5 from "../assets/Sprites/Guns/player gun/playergun-gun-005.png";
 import powerUpAudio from "../assets/Sounds/powerUp.webm";
 import healthImage from "../assets/Sprites/health/health-000.png";
 import HealthPickup from "../entities/HealthPickup";
+import shieldItemImg from "../assets/Sprites/sheld/itemskin-shield-000.png";
+import shieldSpriteImg from "../assets/Sprites/sheld/shield-animation 1-000.png";
+import ShieldPickup from "../entities/ShieldPickup";
 
 import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
 import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
@@ -131,6 +134,8 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("bullet_gun5", bulletSkin5);
 
     this.load.image("health", healthImage);
+    this.load.image("shield-item", shieldItemImg);
+    this.load.image("shield-sprite", shieldSpriteImg);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
@@ -238,6 +243,18 @@ export default class GameScene extends Phaser.Scene {
       this.player.getSprite(),
       this.healthPickups,
       this.collectHealth,
+      null,
+      this
+    );
+
+    // Initialize shield pickups group
+    this.shieldPickups = this.physics.add.group();
+
+    // Setup overlap detection for shield pickups collection
+    this.physics.add.overlap(
+      this.player.getSprite(),
+      this.shieldPickups,
+      this.collectShield,
       null,
       this
     );
@@ -547,8 +564,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handlePlayerEnemyCollision(playerSprite, enemySprite) {
-    // Deal damage to the player
-    this.player.takeDamage(ENEMY_CONFIG.collisionDamage);
+    // Deal damage to the player, passing the enemy sprite as the source
+    this.player.takeDamage(ENEMY_CONFIG.collisionDamage, enemySprite);
 
     // Find and destroy the enemy wrapper via its unified die method
     const index = this.enemies.findIndex((e) => e.sprite === enemySprite);
@@ -660,6 +677,26 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Spawns a shield pickup on the ground.
+   * @param {number} x X coordinate
+   * @param {number} y Y coordinate
+   */
+  spawnShieldPickup(x, y) {
+    const pickup = new ShieldPickup(this, x, y);
+    this.shieldPickups.add(pickup);
+  }
+
+  /**
+   * Callback when player overlaps with a shield pickup.
+   */
+  collectShield(playerSprite, shieldPickup) {
+    if (this.player) {
+      this.player.equipShield();
+      shieldPickup.destroy();
+    }
+  }
+
+  /**
    * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
    */
   shutdown() {
@@ -689,6 +726,11 @@ export default class GameScene extends Phaser.Scene {
     // Clean up health pickups group
     if (this.healthPickups) {
       this.healthPickups.clear(true, true);
+    }
+
+    // Clean up shield pickups group
+    if (this.shieldPickups) {
+      this.shieldPickups.clear(true, true);
     }
 
     // Remove input listeners

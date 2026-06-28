@@ -124,7 +124,7 @@ export default class ProjectileManager {
 
     // Deal damage to the Player wrapper in the scene
     if (this.scene.player) {
-      this.scene.player.takeDamage(10); // Standard damage value
+      this.scene.player.takeDamage(10, bullet); // Standard damage value
     }
   }
 
