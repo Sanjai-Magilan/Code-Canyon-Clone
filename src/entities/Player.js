@@ -12,6 +12,7 @@ export default class Player {
    * @param {string|object} characterInput The character configuration key or object (defaults to "soldier")
    */
   constructor(scene, x, y, characterInput = "soldier") {
+    console.log("Player created");
     this.scene = scene;
 
     // Load character configuration dynamically (supports string key or config object)
@@ -251,6 +252,10 @@ export default class Player {
    * to avoid memory leaks.
    */
   destroy() {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+    console.log("Player destroyed");
+
     this.clearInvincibilityTimers();
 
     if (this.tempWeaponTimer) {
@@ -271,6 +276,11 @@ export default class Player {
       );
     }
 
+    if (this.sprite) {
+      this.sprite.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
+      this.sprite.destroy();
+      this.sprite = null;
+    }
     if (this.head) {
       this.head.destroy();
       this.head = null;

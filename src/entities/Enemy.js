@@ -149,6 +149,15 @@ export default class Enemy {
         scene.weaponDropManager.spawnPickup(deathX, deathY, gunId);
       }
 
+      // Only the Worm enemy can drop hearts (with 20% probability)
+      if (this.sprite.texture.key === "worm") {
+        if (Phaser.Math.Between(1, 100) <= 20) {
+          if (typeof scene.spawnHealthPickup === "function") {
+            scene.spawnHealthPickup(deathX, deathY);
+          }
+        }
+      }
+
       this.sprite.destroy();
     }
   }

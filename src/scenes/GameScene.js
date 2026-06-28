@@ -47,6 +47,8 @@ import gunSkin4 from "../assets/Sprites/Guns/player gun/playergun-gun-004.png";
 import gunSkin5 from "../assets/Sprites/Guns/player gun/playergun-gun-005.png";
 
 import powerUpAudio from "../assets/Sounds/powerUp.webm";
+import healthImage from "../assets/Sprites/health/health-000.png";
+import HealthPickup from "../entities/HealthPickup";
 
 import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
 import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
@@ -128,6 +130,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("bullet_gun4", bulletSkin4);
     this.load.image("bullet_gun5", bulletSkin5);
 
+    this.load.image("health", healthImage);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
@@ -137,6 +140,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
+    console.log("GameScene create");
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+
     const worldWidth = WORLD_CONFIG.width;
     const worldHeight = WORLD_CONFIG.height;
 
@@ -223,6 +229,18 @@ export default class GameScene extends Phaser.Scene {
     this.waveManager.start();
     this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
     this.showWavePopup(this.currentWaveId);
+
+    // Initialize health pickups group
+    this.healthPickups = this.physics.add.group();
+
+    // Setup overlap detection for health pickups collection
+    this.physics.add.overlap(
+      this.player.getSprite(),
+      this.healthPickups,
+      this.collectHealth,
+      null,
+      this
+    );
 
     // Initialize the WeaponDropManager system to handle ground pickups
     this.weaponDropManager = new WeaponDropManager(this);
@@ -346,6 +364,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update() {
+    if (!this.player || this.player.isDead) return;
     try {
       this.player.update(this.cursors);
 
@@ -611,5 +630,68 @@ export default class GameScene extends Phaser.Scene {
         });
       }
     });
+  }
+
+  /**
+   * Spawns a health heart pickup on the ground.
+   * @param {number} x X coordinate
+   * @param {number} y Y coordinate
+   */
+  spawnHealthPickup(x, y) {
+    const pickup = new HealthPickup(this, x, y);
+    this.healthPickups.add(pickup);
+  }
+
+  /**
+   * Callback when player overlaps with a health heart pickup.
+   */
+  collectHealth(playerSprite, heart) {
+    const playerObj = this.player;
+
+    if (playerObj.health < playerObj.maxHealth) {
+      playerObj.heal(1);
+
+      if (this.sound) {
+        this.sound.play("power-up", { volume: 0.5 });
+      }
+
+      heart.destroy();
+    }
+  }
+
+  /**
+   * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
+   */
+  shutdown() {
+    console.log("GameScene shutdown");
+
+    // Stop all active sounds to prevent duplication/leaks
+    if (this.sound) {
+      this.sound.stopAll();
+    }
+
+    // Clean up WaveManager state
+    if (this.waveManager) {
+      this.waveManager.reset();
+    }
+
+    // Clean up player
+    if (this.player) {
+      this.player.destroy();
+    }
+
+    // Clean up active timers
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.remove();
+      this.spawnTimerEvent = null;
+    }
+
+    // Clean up health pickups group
+    if (this.healthPickups) {
+      this.healthPickups.clear(true, true);
+    }
+
+    // Remove input listeners
+    this.input.off("pointerdown");
   }
 }
