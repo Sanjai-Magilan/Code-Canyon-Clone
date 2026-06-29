@@ -23,3 +23,11 @@ const config = {
 };
 
 new Phaser.Game(config);
+
+window.addEventListener("error", (e) => {
+  console.error("GLOBAL ERROR:", e.error);
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("PROMISE ERROR:", e.reason);
+});

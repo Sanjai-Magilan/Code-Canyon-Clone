@@ -52,6 +52,7 @@ import HealthPickup from "../entities/HealthPickup";
 import shieldItemImg from "../assets/Sprites/sheld/itemskin-shield-000.png";
 import shieldSpriteImg from "../assets/Sprites/sheld/shield-animation 1-000.png";
 import ShieldPickup from "../entities/ShieldPickup";
+import playButton from "../assets/Sprites/playButton/btnstart-play-000.png";
 
 import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
 import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
@@ -136,6 +137,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("health", healthImage);
     this.load.image("shield-item", shieldItemImg);
     this.load.image("shield-sprite", shieldSpriteImg);
+    this.load.image("play-button", playButton);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
@@ -145,8 +147,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
-    console.log("GameScene create");
+    console.log("Scene create");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => {
+      console.log("Scene destroy");
+    }, this);
 
     const worldWidth = WORLD_CONFIG.width;
     const worldHeight = WORLD_CONFIG.height;
@@ -231,9 +236,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Initialize the WaveManager system to handle wave configurations and timer scaling
     this.waveManager = new WaveManager(this);
-    this.waveManager.start();
-    this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
-    this.showWavePopup(this.currentWaveId);
+    this.currentWaveId = 1;
 
     // Initialize health pickups group
     this.healthPickups = this.physics.add.group();
@@ -304,30 +307,7 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.enemies = [];
-
-    // Spawn an initial burst of exactly 6 enemies at startup
-    for (let i = 0; i < 6; i++) {
-      const enemy = this.spawnEnemyNearPlayer();
-      this.enemies.push(enemy);
-    }
-
-    // Spawn enemies periodically (capped at wave limit to prevent crash/infinite growth leaks)
-    this.spawnTimerEvent = this.time.addEvent({
-      delay: this.waveManager.getSpawnInterval(),
-      loop: true,
-      callback: () => {
-        try {
-          // Limit active count dynamically based on the current wave configuration
-          const maxActive = this.waveManager.getMaxEnemies();
-          if (this.enemies.length < maxActive) {
-            const enemy = this.spawnEnemyNearPlayer();
-            this.enemies.push(enemy);
-          }
-        } catch (err) {
-          console.error("CRITICAL SPANNING ERROR:", err);
-        }
-      },
-    });
+    this.spawnTimerEvent = null;
 
     this.anims.create({
       key: "gun-fire",
@@ -376,11 +356,38 @@ export default class GameScene extends Phaser.Scene {
 
 
     this.input.on("pointerdown", () => {
+      if (!this.gameStarted) return;
       this.player.shoot();
     });
+
+    // Start Screen / Play Button initialization
+    this.gameStarted = false;
+    const camera = this.cameras.main;
+    const button = this.add.image(camera.centerX, camera.centerY, "play-button");
+    button.setScrollFactor(0);
+    button.setDepth(200000);
+    button.setInteractive({ useHandCursor: true });
+
+    button.on("pointerover", () => {
+      button.setScale(1.1);
+    });
+    button.on("pointerout", () => {
+      button.setScale(1.0);
+    });
+    button.on("pointerdown", () => {
+      button.setScale(0.95);
+    });
+    button.on("pointerup", () => {
+      this.startGame();
+    });
+
+    this.playButton = button;
   }
 
   update() {
+    if (!this.gameStarted) {
+      return;
+    }
     if (!this.player || this.player.isDead) return;
     try {
       this.player.update(this.cursors);
@@ -697,10 +704,58 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Starts the gameplay session, wave manager, spawner, and shows the wave popup.
+   */
+  startGame() {
+    this.gameStarted = true;
+
+    if (this.playButton) {
+      this.playButton.destroy();
+      this.playButton = null;
+    }
+
+    this.waveManager.start();
+    this.startEnemySpawner();
+
+    this.currentWaveId = this.waveManager.getCurrentWaveConfig().id;
+    this.showWavePopup(this.currentWaveId);
+  }
+
+  /**
+   * Starts periodic enemy spawning and initial burst.
+   */
+  startEnemySpawner() {
+    this.enemies = [];
+
+    // Spawn an initial burst of exactly 6 enemies at startup
+    for (let i = 0; i < 6; i++) {
+      const enemy = this.spawnEnemyNearPlayer();
+      this.enemies.push(enemy);
+    }
+
+    // Spawn enemies periodically (capped at wave limit to prevent leaks)
+    this.spawnTimerEvent = this.time.addEvent({
+      delay: this.waveManager.getSpawnInterval(),
+      loop: true,
+      callback: () => {
+        try {
+          const maxActive = this.waveManager.getMaxEnemies();
+          if (this.enemies.length < maxActive) {
+            const enemy = this.spawnEnemyNearPlayer();
+            this.enemies.push(enemy);
+          }
+        } catch (err) {
+          console.error("CRITICAL SPANNING ERROR:", err);
+        }
+      },
+    });
+  }
+
+  /**
    * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
    */
   shutdown() {
-    console.log("GameScene shutdown");
+    console.log("Scene shutdown");
 
     // Stop all active sounds to prevent duplication/leaks
     if (this.sound) {
@@ -724,13 +779,19 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Clean up health pickups group
-    if (this.healthPickups) {
+    if (this.healthPickups && this.healthPickups.children && this.healthPickups.children.entries) {
       this.healthPickups.clear(true, true);
     }
 
     // Clean up shield pickups group
-    if (this.shieldPickups) {
+    if (this.shieldPickups && this.shieldPickups.children && this.shieldPickups.children.entries) {
       this.shieldPickups.clear(true, true);
+    }
+
+    // Destroy play button if active
+    if (this.playButton) {
+      this.playButton.destroy();
+      this.playButton = null;
     }
 
     // Remove input listeners

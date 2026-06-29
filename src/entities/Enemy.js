@@ -149,24 +149,27 @@ export default class Enemy {
         scene.weaponDropManager.spawnPickup(deathX, deathY, gunId);
       }
 
-      // Only the Worm enemy can drop hearts (with 20% probability)
+      // Only the Worm enemy can drop hearts (with 5% probability)
       if (this.sprite.texture.key === "worm") {
-        if (Phaser.Math.Between(1, 100) <= 20) {
+        if (Phaser.Math.Between(1, 100) <= 5) {
           if (typeof scene.spawnHealthPickup === "function") {
             scene.spawnHealthPickup(deathX, deathY);
           }
         }
-        // Drop shield with 15% probability to allow immediate Wave 1 testing
-        if (Phaser.Math.Between(1, 100) <= 15) {
+      }
+
+      // Only the Crab enemy can drop shields (with 10% probability)
+      if (this.sprite.texture.key === "crab") {
+        if (Phaser.Math.Between(1, 100) <= 10) {
           if (typeof scene.spawnShieldPickup === "function") {
             scene.spawnShieldPickup(deathX, deathY);
           }
         }
       }
 
-      // Only the Crab enemy can drop shields (with 20% probability)
-      if (this.sprite.texture.key === "crab") {
-        if (Phaser.Math.Between(1, 100) <= 20) {
+      // Only the Angler enemy can drop shields (with 15% probability)
+      if (this.sprite.texture.key === "angler") {
+        if (Phaser.Math.Between(1, 100) <= 15) {
           if (typeof scene.spawnShieldPickup === "function") {
             scene.spawnShieldPickup(deathX, deathY);
           }

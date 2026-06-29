@@ -272,7 +272,10 @@ export default class Player {
     this.isDestroyed = true;
     console.log("Player destroyed");
 
-    this.destroyShield();
+    // Determine if this destroy is part of the scene's shutdown/restart pipeline
+    const sceneShutdown = !this.scene || !this.scene.scene || !this.scene.scene.isActive();
+
+    this.destroyShield(sceneShutdown);
     this.clearInvincibilityTimers();
 
     if (this.tempWeaponTimer) {
@@ -295,28 +298,40 @@ export default class Player {
 
     if (this.sprite) {
       this.sprite.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
-      this.sprite.destroy();
+      if (!sceneShutdown && this.sprite.active) {
+        this.sprite.destroy();
+      }
       this.sprite = null;
     }
     if (this.head) {
-      this.head.destroy();
+      if (!sceneShutdown && this.head.active) {
+        this.head.destroy();
+      }
       this.head = null;
     }
     if (this.gun) {
-      this.gun.destroy();
+      if (!sceneShutdown && this.gun.active) {
+        this.gun.destroy();
+      }
       this.gun = null;
     }
     if (this.flash) {
-      this.flash.destroy();
+      if (!sceneShutdown && this.flash.active) {
+        this.flash.destroy();
+      }
       this.flash = null;
     }
     if (this.shadow) {
-      this.shadow.destroy();
+      if (!sceneShutdown && this.shadow.active) {
+        this.shadow.destroy();
+      }
       this.shadow = null;
     }
   }
 
   takeDamage(amount, source = null) {
+    if (this.isDead) return;
+
     console.trace("takeDamage called");
 
     if (this.hasShield && source) {
@@ -352,6 +367,7 @@ export default class Player {
     this.scene.sound.play("player-oof", { volume: 0.3 });
 
     this.health = Math.max(0, this.health - 1);
+    console.log("Health:", this.health);
     console.trace("health changed");
     console.log(
       "Player hit",
@@ -364,6 +380,7 @@ export default class Player {
     }
 
     if (this.health <= 0) {
+      console.log("Calling die()");
       this.die();
     } else {
       this.startInvincibility();
@@ -375,6 +392,7 @@ export default class Player {
    * @param {number} amount Health amount
    */
   heal(amount) {
+    if (this.isDead) return;
     this.health = Math.min(this.maxHealth, this.health + amount);
     console.trace("health changed");
     if (this.scene && typeof this.scene.updateHearts === "function") {
@@ -391,7 +409,7 @@ export default class Player {
 
     this.destroyShield();
 
-    console.log("Player died!");
+    console.log("Player died");
     this.clearInvincibilityTimers();
     this.setPlayerAlpha(1.0);
 
@@ -409,10 +427,19 @@ export default class Player {
       this.scene.cameras.main.shake(300, 0.02);
     }
 
-    // Restart the scene after 1000ms delay
+    // Restart the scene after 1000ms delay using Phaser's Clock
+    console.log("Restart timer started");
     if (this.scene && this.scene.time) {
       this.scene.time.delayedCall(1000, () => {
-        this.scene.scene.restart();
+        console.log("Restart callback entered");
+        if (this.scene && this.scene.scene) {
+          try {
+            console.log("Scene restarting");
+            this.scene.scene.restart();
+          } catch (err) {
+            console.error("CRITICAL ERROR RESTARTING SCENE:", err);
+          }
+        }
       });
     }
   }
@@ -421,6 +448,7 @@ export default class Player {
    * Equips the directional shield and configures durability.
    */
   equipShield() {
+    if (this.isDead) return;
     if (this.hasShield) {
       this.shieldHitsRemaining = 3;
       return;
@@ -437,12 +465,15 @@ export default class Player {
 
   /**
    * Destroys the shield and resets shield states.
+   * @param {boolean} sceneShutdown Whether the scene is shutting down/restarting
    */
-  destroyShield() {
+  destroyShield(sceneShutdown = false) {
     this.hasShield = false;
     this.shieldHitsRemaining = 0;
     if (this.shield) {
-      this.shield.destroy();
+      if (!sceneShutdown && this.shield.active) {
+        this.shield.destroy();
+      }
       this.shield = null;
     }
   }
