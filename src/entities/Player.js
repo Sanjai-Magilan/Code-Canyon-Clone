@@ -354,6 +354,15 @@ export default class Player {
 
       if (Math.abs(diff) <= Math.PI / 4) { // covers ±45 degrees
         this.blockDamage();
+
+        // If the damage source is an enemy sprite, kill it immediately upon hitting the shield
+        if (this.scene && this.scene.enemies) {
+          const enemy = this.scene.enemies.find(e => e.sprite === source);
+          if (enemy) {
+            enemy.die();
+          }
+        }
+
         return;
       }
     }
@@ -459,7 +468,7 @@ export default class Player {
 
     // Create shield sprite attached to player
     this.shield = this.scene.add.image(this.sprite.x, this.sprite.y, "shield-sprite");
-    this.shield.setScale(this.characterConfig.scale * 0.85);
+    this.shield.setScale(this.characterConfig.scale * 1.4);
     this.shield.setDepth(this.sprite.depth + 1);
   }
 

@@ -19,7 +19,7 @@ export default class ShieldPickup extends Phaser.Physics.Arcade.Sprite {
     if (this.body) {
       this.body.setImmovable(true);
     }
-    this.setScale(0.85);
+    this.setScale(1);
 
     // Float slightly up and down using a tween
     this.floatTween = scene.tweens.add({
