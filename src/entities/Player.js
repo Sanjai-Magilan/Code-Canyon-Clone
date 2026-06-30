@@ -493,6 +493,11 @@ export default class Player {
   blockDamage() {
     this.shieldHitsRemaining--;
 
+    // Update shield power-up UI
+    if (this.scene && typeof this.scene.updatePowerupUI === "function") {
+      this.scene.updatePowerupUI();
+    }
+
     if (this.scene) {
       // Play blocking feedback audio
       if (this.scene.sound) {
@@ -650,6 +655,12 @@ export default class Player {
     // Check shot count limit for temporary weapons
     if (this.tempWeaponMaxShots !== null) {
       this.tempWeaponShotsFired++;
+
+      // Update UI manager shot count
+      if (this.scene && typeof this.scene.updatePowerupUI === "function") {
+        this.scene.updatePowerupUI();
+      }
+
       if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
         this.scene.time.delayedCall(0, () => {
           this.revertToDefaultWeapon();
@@ -741,6 +752,23 @@ export default class Player {
 
     // Optional audio hook (power-up pickup sound)
     this.scene.sound.play("power-up", { volume: 0.5 });
+
+    // Call UI manager to display the power-up slot icon
+    if (this.scene && typeof this.scene.showPowerup === "function") {
+      if (duration) {
+        this.scene.showPowerup({
+          iconKey: `drop_${gunId}`,
+          duration: duration / 1000,
+          type: "time"
+        });
+      } else if (this.tempWeaponMaxShots !== null) {
+        this.scene.showPowerup({
+          iconKey: `drop_${gunId}`,
+          duration: this.tempWeaponMaxShots,
+          type: "shots"
+        });
+      }
+    }
   }
 
   /**
@@ -759,6 +787,11 @@ export default class Player {
     // Restore default skin and weapon configuration
     this.gun.setTexture(this.characterConfig.gunTexture);
     this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
+
+    // Clear UI manager icon
+    if (this.scene && typeof this.scene.clearPowerup === "function") {
+      this.scene.clearPowerup();
+    }
   }
 
   /**

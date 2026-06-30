@@ -53,6 +53,7 @@ import shieldItemImg from "../assets/Sprites/sheld/itemskin-shield-000.png";
 import shieldSpriteImg from "../assets/Sprites/sheld/shield-animation 1-000.png";
 import ShieldPickup from "../entities/ShieldPickup";
 import playButton from "../assets/Sprites/playButton/btnstart-play-000.png";
+import slotFrameImg from "../assets/Sprites/powerup holder/slotframe-animation 1-000.png";
 
 import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
 import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
@@ -138,6 +139,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("shield-item", shieldItemImg);
     this.load.image("shield-sprite", shieldSpriteImg);
     this.load.image("play-button", playButton);
+    this.load.image("slot-frame", slotFrameImg);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
@@ -344,6 +346,20 @@ export default class GameScene extends Phaser.Scene {
     this.healthBarHolder.setScrollFactor(0);
     this.healthBarHolder.setDepth(100000);
 
+    // Create Power-Up Holder UI Slot
+    const frameX = this.cameras.main.width - 80;
+    const frameY = 80;
+
+    this.slotFrame = this.add.image(frameX, frameY, "slot-frame");
+    this.slotFrame.setScrollFactor(0);
+    this.slotFrame.setDepth(100000);
+    this.slotFrame.setScale(0.85);
+
+    this.powerupIcon = this.add.image(frameX, frameY, "shield-item");
+    this.powerupIcon.setScrollFactor(0);
+    this.powerupIcon.setDepth(100001);
+    this.powerupIcon.setVisible(false);
+
     // Centered Heart count digit sprite inside the health bar slot
     this.heartCountSprite = this.add.sprite(196, 90, "hud-font");
     this.heartCountSprite.setFrame(57); // '5'
@@ -364,18 +380,19 @@ export default class GameScene extends Phaser.Scene {
     this.gameStarted = false;
     const camera = this.cameras.main;
     const button = this.add.image(camera.centerX, camera.centerY, "play-button");
+    button.setScale(0.5); 
     button.setScrollFactor(0);
     button.setDepth(200000);
     button.setInteractive({ useHandCursor: true });
 
     button.on("pointerover", () => {
-      button.setScale(1.1);
+      button.setScale(0.55);
     });
     button.on("pointerout", () => {
-      button.setScale(1.0);
+      button.setScale(0.5);
     });
     button.on("pointerdown", () => {
-      button.setScale(0.95);
+      button.setScale(0.55);
     });
     button.on("pointerup", () => {
       this.startGame();
@@ -699,6 +716,11 @@ export default class GameScene extends Phaser.Scene {
   collectShield(playerSprite, shieldPickup) {
     if (this.player) {
       this.player.equipShield();
+      this.showPowerup({
+        iconKey: "shield-item",
+        duration: 3,
+        type: "shield"
+      });
       shieldPickup.destroy();
     }
   }
@@ -752,10 +774,137 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Configures and displays an active temporary power-up icon inside the slot frame.
+   * @param {object} config Power-up description (iconKey, duration, type)
+   */
+  showPowerup(config) {
+    this.clearPowerup();
+
+    this.activePowerup = {
+      iconKey: config.iconKey,
+      type: config.type,
+      duration: config.duration,
+      remaining: config.duration
+    };
+
+    if (this.powerupIcon) {
+      this.powerupIcon.setTexture(config.iconKey);
+      this.powerupIcon.setVisible(true);
+      this.powerupIcon.setAlpha(1.0);
+      // Align scaling nicely for shield icon vs gun icons
+      this.powerupIcon.setScale(config.iconKey === "shield-item" ? 0.75 : 0.85);
+    }
+
+    if (config.type === "time") {
+      const durationMs = config.duration * 1000;
+      const warningDelay = Math.max(0, durationMs - 5000);
+
+      this.powerupBlinkTimer = this.time.delayedCall(warningDelay, () => {
+        this.startPowerupBlinking();
+      }, [], this);
+
+      this.powerupExpireTimer = this.time.delayedCall(durationMs, () => {
+        this.clearPowerup();
+      }, [], this);
+    } else {
+      this.updatePowerupUI();
+    }
+  }
+
+  /**
+   * Triggers the slot frame warning blink animation.
+   */
+  startPowerupBlinking() {
+    if (!this.powerupIcon || this.powerupBlinkTween) return;
+
+    this.powerupBlinkTween = this.tweens.add({
+      targets: this.powerupIcon,
+      alpha: 0.3,
+      yoyo: true,
+      repeat: -1,
+      duration: 150
+    });
+  }
+
+  /**
+   * Resets active power-up states and stops all timers.
+   */
+  clearPowerup() {
+    this.activePowerup = null;
+
+    if (this.powerupIcon) {
+      this.powerupIcon.setVisible(false);
+      this.powerupIcon.setAlpha(1.0);
+    }
+
+    if (this.powerupBlinkTween) {
+      this.powerupBlinkTween.remove();
+      this.powerupBlinkTween = null;
+    }
+
+    if (this.powerupBlinkTimer) {
+      this.powerupBlinkTimer.remove();
+      this.powerupBlinkTimer = null;
+    }
+
+    if (this.powerupExpireTimer) {
+      this.powerupExpireTimer.remove();
+      this.powerupExpireTimer = null;
+    }
+  }
+
+  /**
+   * Updates shot counts or durability states.
+   */
+  updatePowerupUI() {
+    if (!this.activePowerup) return;
+
+    if (this.activePowerup.type === "shots") {
+      const remainingShots = this.player.tempWeaponMaxShots - this.player.tempWeaponShotsFired;
+      this.activePowerup.remaining = remainingShots;
+
+      if (remainingShots <= 0) {
+        this.clearPowerup();
+      } else if (remainingShots === 1) {
+        this.startPowerupBlinking();
+      }
+    } else if (this.activePowerup.type === "shield") {
+      const remainingShield = this.player.shieldHitsRemaining;
+      this.activePowerup.remaining = remainingShield;
+
+      if (remainingShield <= 0) {
+        this.clearPowerup();
+      } else if (remainingShield === 1) {
+        this.startPowerupBlinking();
+      }
+    }
+  }
+
+  /**
+   * Helper alias/hook to update the powerup state.
+   */
+  updatePowerupTimer() {
+    this.updatePowerupUI();
+  }
+
+  /**
    * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
    */
   shutdown() {
     console.log("Scene shutdown");
+
+    // Clean up active power-up states and timers
+    this.clearPowerup();
+
+    if (this.slotFrame) {
+      this.slotFrame.destroy();
+      this.slotFrame = null;
+    }
+
+    if (this.powerupIcon) {
+      this.powerupIcon.destroy();
+      this.powerupIcon = null;
+    }
 
     // Stop all active sounds to prevent duplication/leaks
     if (this.sound) {
