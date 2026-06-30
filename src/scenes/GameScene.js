@@ -54,6 +54,8 @@ import shieldSpriteImg from "../assets/Sprites/sheld/shield-animation 1-000.png"
 import ShieldPickup from "../entities/ShieldPickup";
 import playButton from "../assets/Sprites/playButton/btnstart-play-000.png";
 import slotFrameImg from "../assets/Sprites/powerup holder/slotframe-animation 1-000.png";
+import lightningIconImg from "../assets/Sprites/lightining power/itemskin-basehp-000.png";
+import beamImg from "../assets/Sprites/lightining power/beam_ends_spritesheet.png";
 
 import bulletSkin1 from "../assets/Sprites/Guns/bullet/bulletskin-0-001.png";
 import bulletSkin2 from "../assets/Sprites/Guns/bullet/bulletskin-0-002.png";
@@ -65,7 +67,7 @@ import hudFontImg from "../assets/Sprites/font/fonth.png";
 
 const POWERUP_ICON_SCALE = {
   "shield-item": 0.75,
-  "defaultGun": 0.38,
+  "defaultGun": 0.32,
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -149,6 +151,11 @@ export default class GameScene extends Phaser.Scene {
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
       frameHeight: 157
+    });
+    this.load.image("lightning-icon", lightningIconImg);
+    this.load.spritesheet("lightning-beam", beamImg, {
+      frameWidth: 200,
+      frameHeight: 200
     });
     this.load.audio("power-up", powerUpAudio);
   }
@@ -338,6 +345,15 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
+    if (!this.anims.exists("lightning-strike")) {
+      this.anims.create({
+        key: "lightning-strike",
+        frames: this.anims.generateFrameNumbers("lightning-beam", { start: 0, end: 2 }),
+        frameRate: 12,
+        repeat: 0
+      });
+    }
+
     // Play background music (looped, volume at 0.5)
     this.bgm = this.sound.add("bgm", {
       loop: true,
@@ -387,10 +403,37 @@ export default class GameScene extends Phaser.Scene {
 
     this.updateHearts();
 
+    // Lightning Power Initialization
+    this.lightningKills = [];
+    this.lightningReady = false;
+    this.lightningPulseTween = null;
 
+    this.lightningIcon = this.add.image(360, 80, "lightning-icon");
+    this.lightningIcon.setScrollFactor(0);
+    this.lightningIcon.setDepth(100000);
+    this.lightningIcon.setScale(0.85);
+    this.lightningIcon.setTint(0x777777);
+    this.lightningIcon.setAlpha(0.35);
 
-    this.input.on("pointerdown", () => {
+    // Mouse click activation
+    this.lightningIcon.setInteractive({ useHandCursor: true });
+    this.lightningIcon.on("pointerdown", (pointer, localX, localY, event) => {
+      if (event) {
+        event.stopPropagation();
+      }
+      this.triggerLightningAttack();
+    });
+
+    // Keyboard activation (Q key)
+    this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+
+    this.input.on("pointerdown", (pointer, currentlyOver) => {
       if (!this.gameStarted) return;
+      if (currentlyOver && currentlyOver.length > 0) {
+        if (currentlyOver.includes(this.lightningIcon)) {
+          return;
+        }
+      }
       this.player.shoot();
     });
 
@@ -468,7 +511,9 @@ export default class GameScene extends Phaser.Scene {
 
       // Update enemy AI behaviors (pathfinding/velocity update)
       for (const enemy of this.enemies) {
-        enemy.update(playerSprite);
+        if (!enemy.isFrozen) {
+          enemy.update(playerSprite);
+        }
       }
 
       // Dynamic depth sorting (Y-Sorting) for correct overlapping visuals
@@ -1002,14 +1047,122 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Tracks enemy kills to charge the lightning power-up.
+   */
+  onEnemyKilled() {
+    const now = this.time.now;
+    this.lightningKills.push(now);
+
+    // Keep only kills from last 4 seconds
+    this.lightningKills = this.lightningKills.filter(t => now - t <= 4000);
+
+    if (this.lightningKills.length >= 5 && !this.lightningReady) {
+      this.chargeLightning();
+    }
+  }
+
+  /**
+   * Lights up the HUD icon and starts the pulse tween.
+   */
+  chargeLightning() {
+    this.lightningReady = true;
+
+    if (this.lightningIcon) {
+      this.lightningIcon.clearTint();
+      this.lightningIcon.setAlpha(1.0);
+
+      if (this.lightningPulseTween) {
+        this.lightningPulseTween.remove();
+      }
+      this.lightningPulseTween = this.tweens.add({
+        targets: this.lightningIcon,
+        scale: 1.05,
+        duration: 300,
+        yoyo: true,
+        repeat: -1
+      });
+    }
+  }
+
+  /**
+   * Triggers lightning strikes simultaneously on all visible enemies.
+   */
+  triggerLightningAttack() {
+    if (!this.lightningReady || !this.player || this.player.isDead) return;
+
+    // Get camera viewport boundary
+    const view = this.cameras.main.worldView;
+
+    // Find all enemies on screen
+    const visibleEnemies = this.enemies.filter(enemy => 
+      enemy && enemy.sprite && enemy.sprite.active &&
+      view.contains(enemy.sprite.x, enemy.sprite.y)
+    );
+
+    if (visibleEnemies.length > 0) {
+      // Play deep power sound
+      this.sound.play("shoot", { volume: 0.8, pitch: 0.5 });
+
+      visibleEnemies.forEach(enemy => {
+        // Create lightning beam sprite at enemy's position
+        const beam = this.add.sprite(enemy.sprite.x, enemy.sprite.y - 50, "lightning-beam");
+        beam.setScale(1.5);
+        beam.setDepth(enemy.sprite.depth + 10);
+        beam.play("lightning-strike");
+
+        // Freeze velocity
+        enemy.isFrozen = true;
+        if (enemy.sprite.body) {
+          enemy.sprite.setVelocity(0, 0);
+        }
+
+        beam.once("animationcomplete", () => {
+          beam.destroy();
+          // Kill the enemy and trigger normal drops / XP
+          if (enemy && typeof enemy.die === "function") {
+            enemy.die();
+          }
+        });
+      });
+    }
+
+    this.resetLightningPower();
+  }
+
+  /**
+   * Resets active lightning state.
+   */
+  resetLightningPower() {
+    this.lightningReady = false;
+    this.lightningKills = [];
+
+    if (this.lightningIcon) {
+      this.lightningIcon.setTint(0x777777);
+      this.lightningIcon.setAlpha(0.35);
+      this.lightningIcon.setScale(0.85);
+    }
+
+    if (this.lightningPulseTween) {
+      this.lightningPulseTween.remove();
+      this.lightningPulseTween = null;
+    }
+  }
+
+  /**
    * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
    */
   shutdown() {
     console.log("Scene shutdown");
 
-    // Clean up active power-up states and timers
+    // Clean up active power-up states, lightning, and timers
     this.clearWeaponPowerup();
     this.clearShieldPowerup();
+    this.resetLightningPower();
+
+    if (this.lightningIcon) {
+      this.lightningIcon.destroy();
+      this.lightningIcon = null;
+    }
 
     if (this.weaponSlotFrame) {
       this.weaponSlotFrame.destroy();

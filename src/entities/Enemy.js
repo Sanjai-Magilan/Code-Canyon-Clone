@@ -131,6 +131,12 @@ export default class Enemy {
     this.isDead = true;
 
     const scene = this.scene;
+
+    // Call scene onEnemyKilled hook to register kill streak progress
+    if (scene && typeof scene.onEnemyKilled === "function") {
+      scene.onEnemyKilled();
+    }
+
     const index = scene.enemies.findIndex((e) => e === this);
     if (index !== -1) {
       scene.enemies.splice(index, 1);
