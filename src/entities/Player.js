@@ -485,6 +485,10 @@ export default class Player {
       }
       this.shield = null;
     }
+    // Clear shield power-up UI
+    if (this.scene && typeof this.scene.clearShieldPowerup === "function") {
+      this.scene.clearShieldPowerup();
+    }
   }
 
   /**
@@ -494,8 +498,8 @@ export default class Player {
     this.shieldHitsRemaining--;
 
     // Update shield power-up UI
-    if (this.scene && typeof this.scene.updatePowerupUI === "function") {
-      this.scene.updatePowerupUI();
+    if (this.scene && typeof this.scene.updateShieldPowerupUI === "function") {
+      this.scene.updateShieldPowerupUI();
     }
 
     if (this.scene) {
@@ -657,8 +661,8 @@ export default class Player {
       this.tempWeaponShotsFired++;
 
       // Update UI manager shot count
-      if (this.scene && typeof this.scene.updatePowerupUI === "function") {
-        this.scene.updatePowerupUI();
+      if (this.scene && typeof this.scene.updateWeaponPowerupUI === "function") {
+        this.scene.updateWeaponPowerupUI();
       }
 
       if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
@@ -754,15 +758,15 @@ export default class Player {
     this.scene.sound.play("power-up", { volume: 0.5 });
 
     // Call UI manager to display the power-up slot icon
-    if (this.scene && typeof this.scene.showPowerup === "function") {
+    if (this.scene && typeof this.scene.showWeaponPowerup === "function") {
       if (duration) {
-        this.scene.showPowerup({
+        this.scene.showWeaponPowerup({
           iconKey: `drop_${gunId}`,
           duration: duration / 1000,
           type: "time"
         });
       } else if (this.tempWeaponMaxShots !== null) {
-        this.scene.showPowerup({
+        this.scene.showWeaponPowerup({
           iconKey: `drop_${gunId}`,
           duration: this.tempWeaponMaxShots,
           type: "shots"
@@ -789,8 +793,8 @@ export default class Player {
     this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
 
     // Clear UI manager icon
-    if (this.scene && typeof this.scene.clearPowerup === "function") {
-      this.scene.clearPowerup();
+    if (this.scene && typeof this.scene.clearWeaponPowerup === "function") {
+      this.scene.clearWeaponPowerup();
     }
   }
 
