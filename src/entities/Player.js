@@ -58,6 +58,16 @@ export default class Player {
     this.shieldDirection = "right";
     this.shieldHitsRemaining = 0;
 
+    // --- Dash System State ---
+    this.isDashing = false;
+    this.canDash = true;
+    this.lastDashTime = 0;
+    this.lastMoveDirection = new Phaser.Math.Vector2(1, 0);
+
+    if (this.scene && this.scene.input && this.scene.input.keyboard) {
+      this.spaceKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    }
+
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
     this.sprite.setScale(this.characterConfig.scale);
@@ -142,6 +152,13 @@ export default class Player {
   update(cursors) {
     if (this.isDead || !this.sprite.body) return;
 
+    // Check space key down for dash
+    if (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      this.dash();
+    }
+
+    if (this.isDashing) return;
+
     // Reset velocity on every update cycle
     this.sprite.setVelocity(0);
 
@@ -157,6 +174,18 @@ export default class Player {
       (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
     const downDown =
       (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
+
+    // Calculate current movement direction vector
+    const currentDir = new Phaser.Math.Vector2(0, 0);
+    if (leftDown) currentDir.x = -1;
+    else if (rightDown) currentDir.x = 1;
+
+    if (upDown) currentDir.y = -1;
+    else if (downDown) currentDir.y = 1;
+
+    if (currentDir.x !== 0 || currentDir.y !== 0) {
+      this.lastMoveDirection.copy(currentDir).normalize();
+    }
 
     // Handle horizontal movement
     if (leftDown) {
@@ -327,10 +356,67 @@ export default class Player {
       }
       this.shadow = null;
     }
+
+    // Clean up dash timers
+    if (this.dashTimer) {
+      this.dashTimer.remove();
+      this.dashTimer = null;
+    }
+    if (this.dashCooldownTimer) {
+      this.dashCooldownTimer.remove();
+      this.dashCooldownTimer = null;
+    }
+  }
+
+  /**
+   * Executes the dash ability.
+   */
+  dash() {
+    if (!this.canDash || this.isDashing || this.isDead) return;
+
+    this.isDashing = true;
+    this.canDash = false;
+
+    // Visual effect: make player slightly transparent
+    this.sprite.setAlpha(0.7);
+    if (this.head) this.head.setAlpha(0.7);
+    if (this.gun) this.gun.setAlpha(0.7);
+    if (this.shadow) this.shadow.setAlpha(0.7);
+    if (this.shield) this.shield.setAlpha(0.7);
+
+    // Calculate direction and speed
+    const dir = this.lastMoveDirection.clone().normalize();
+    const dashSpeed = PLAYER_CONFIG.dash.distance / (PLAYER_CONFIG.dash.duration / 1000);
+
+    this.sprite.setVelocity(dir.x * dashSpeed, dir.y * dashSpeed);
+
+    // Keep running animation active
+    const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
+    if (!this.sprite.anims.isPlaying || this.sprite.anims.currentAnim.key !== runAnimKey) {
+      this.sprite.play(runAnimKey);
+    }
+
+    // End dash after duration
+    this.dashTimer = this.scene.time.delayedCall(PLAYER_CONFIG.dash.duration, () => {
+      this.isDashing = false;
+      if (this.sprite && this.sprite.body) {
+        this.sprite.setVelocity(0, 0);
+        this.sprite.setAlpha(1.0);
+      }
+      if (this.head) this.head.setAlpha(1.0);
+      if (this.gun) this.gun.setAlpha(1.0);
+      if (this.shadow) this.shadow.setAlpha(1.0);
+      if (this.shield) this.shield.setAlpha(1.0);
+
+      // Start cooldown timer
+      this.dashCooldownTimer = this.scene.time.delayedCall(PLAYER_CONFIG.dash.cooldown, () => {
+        this.canDash = true;
+      });
+    });
   }
 
   takeDamage(amount, source = null) {
-    if (this.isDead) return;
+    if (this.isDead || this.isDashing) return;
 
     console.trace("takeDamage called");
 

@@ -367,29 +367,29 @@ export default class GameScene extends Phaser.Scene {
     this.healthBarHolder.setScrollFactor(0);
     this.healthBarHolder.setDepth(100000);
 
-    // Create Power-Up Holder UI Slots
-    const frameX = this.cameras.main.width - 80;
-    const weaponFrameY = 80;
-    const shieldFrameY = 210;
+    // Create Power-Up Holder UI Slots (Horizontal Layout)
+    const shieldX = this.cameras.main.width - 80;
+    const weaponX = this.cameras.main.width - 195;
+    const slotY = 80;
 
     // Weapon Slot
-    this.weaponSlotFrame = this.add.image(frameX, weaponFrameY, "slot-frame");
+    this.weaponSlotFrame = this.add.image(weaponX, slotY, "slot-frame");
     this.weaponSlotFrame.setScrollFactor(0);
     this.weaponSlotFrame.setDepth(100000);
     this.weaponSlotFrame.setScale(0.85);
 
-    this.weaponPowerupIcon = this.add.image(frameX, weaponFrameY, "__DEFAULT");
+    this.weaponPowerupIcon = this.add.image(weaponX, slotY, "__DEFAULT");
     this.weaponPowerupIcon.setScrollFactor(0);
     this.weaponPowerupIcon.setDepth(100001);
     this.weaponPowerupIcon.setVisible(false);
 
     // Shield Slot
-    this.shieldSlotFrame = this.add.image(frameX, shieldFrameY, "slot-frame");
+    this.shieldSlotFrame = this.add.image(shieldX, slotY, "slot-frame");
     this.shieldSlotFrame.setScrollFactor(0);
     this.shieldSlotFrame.setDepth(100000);
     this.shieldSlotFrame.setScale(0.85);
 
-    this.shieldPowerupIcon = this.add.image(frameX, shieldFrameY, "__DEFAULT");
+    this.shieldPowerupIcon = this.add.image(shieldX, slotY, "__DEFAULT");
     this.shieldPowerupIcon.setScrollFactor(0);
     this.shieldPowerupIcon.setDepth(100001);
     this.shieldPowerupIcon.setVisible(false);
