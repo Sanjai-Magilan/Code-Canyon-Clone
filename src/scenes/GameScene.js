@@ -509,10 +509,68 @@ export default class GameScene extends Phaser.Scene {
         );
       }
 
-      // Update enemy AI behaviors (pathfinding/velocity update)
+      // Despawn off-screen enemies far behind the player
+      const view = this.cameras.main.worldView;
+      const despawnMargin = 400;
+
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const enemy = this.enemies[i];
+        if (enemy && enemy.sprite && enemy.sprite.active) {
+          if (
+            enemy.sprite.x < view.x - despawnMargin ||
+            enemy.sprite.x > view.right + despawnMargin ||
+            enemy.sprite.y < view.y - despawnMargin ||
+            enemy.sprite.y > view.bottom + despawnMargin
+          ) {
+            if (this.enemiesGroup) {
+              this.enemiesGroup.remove(enemy.sprite);
+            }
+            if (enemy.sprite) {
+              enemy.sprite.destroy();
+            }
+            this.enemies.splice(i, 1);
+          }
+        }
+      }
+
+      // Update enemy AI behaviors (pathfinding/velocity update) and lightweight separation
       for (const enemy of this.enemies) {
         if (!enemy.isFrozen) {
           enemy.update(playerSprite);
+
+          // Apply lightweight repulsion separation from other nearby active enemies
+          if (enemy.sprite && enemy.sprite.body && enemy.sprite.active) {
+            let repelX = 0;
+            let repelY = 0;
+            let count = 0;
+
+            for (const other of this.enemies) {
+              if (other === enemy || !other.sprite || !other.sprite.active) continue;
+
+              const dist = Phaser.Math.Distance.Between(
+                enemy.sprite.x,
+                enemy.sprite.y,
+                other.sprite.x,
+                other.sprite.y
+              );
+
+              if (dist > 0 && dist < 80) {
+                const diffX = enemy.sprite.x - other.sprite.x;
+                const diffY = enemy.sprite.y - other.sprite.y;
+
+                const weight = (80 - dist) / 80;
+                repelX += (diffX / dist) * weight;
+                repelY += (diffY / dist) * weight;
+                count++;
+              }
+            }
+
+            if (count > 0) {
+              const strength = 30; // 30 px/s separation force
+              enemy.sprite.body.velocity.x += (repelX / count) * strength;
+              enemy.sprite.body.velocity.y += (repelY / count) * strength;
+            }
+          }
         }
       }
 
@@ -545,10 +603,23 @@ export default class GameScene extends Phaser.Scene {
   }
 
   spawnEnemyNearPlayer() {
+    // 1. Maximum Active Enemies Check (Max 5 active and visible on screen)
+    const visibleEnemies = this.enemies.filter(enemy => {
+      return enemy.sprite &&
+             enemy.sprite.active &&
+             this.cameras.main.worldView.contains(
+               enemy.sprite.x,
+               enemy.sprite.y
+             );
+    });
+
+    if (visibleEnemies.length >= 5) {
+      return null;
+    }
+
     const player = this.player.getSprite();
     const distance = ENEMY_CONFIG.spawn.distance;
     const margin = ENEMY_CONFIG.spawn.margin;
-    const maxAttempts = ENEMY_CONFIG.spawn.maxAttempts;
     const worldWidth = WORLD_CONFIG.width;
     const worldHeight = WORLD_CONFIG.height;
     const camera = this.cameras.main;
@@ -557,73 +628,60 @@ export default class GameScene extends Phaser.Scene {
     let y = 0;
     let validSpawn = false;
 
-    // Try up to maxAttempts random angles to find a spawn point within boundaries and outside viewport
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    // Check if player is moving to determine spawn direction
+    const isMoving = player.body && player.body.velocity.lengthSq() > 100;
+    let baseAngle = 0;
+    if (isMoving && this.player && this.player.lastMoveDirection) {
+      baseAngle = Math.atan2(
+        this.player.lastMoveDirection.y,
+        this.player.lastMoveDirection.x
+      );
+    }
+
+    // Try up to 10 attempts to find a valid spawn position (min 120px separation)
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let angle;
+      if (isMoving && this.player && this.player.lastMoveDirection) {
+        // Spawn within a cone in front of the player (120 degrees size)
+        angle = baseAngle + Phaser.Math.FloatBetween(-Math.PI / 3, Math.PI / 3);
+      } else {
+        angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      }
+
       x = player.x + Math.cos(angle) * distance;
       y = player.y + Math.sin(angle) * distance;
 
       const outsideScreen = !camera.worldView.contains(x, y);
-
-      if (
+      const withinBounds = (
         x >= margin &&
         x <= worldWidth - margin &&
         y >= margin &&
-        y <= worldHeight - margin &&
-        outsideScreen
-      ) {
-        validSpawn = true;
-        break;
+        y <= worldHeight - margin
+      );
+
+      if (withinBounds && outsideScreen) {
+        // Separation check: min 120px from other active enemies
+        let separated = true;
+        for (const enemy of this.enemies) {
+          if (enemy && enemy.sprite && enemy.sprite.active) {
+            const dist = Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y);
+            if (dist < 120) {
+              separated = false;
+              break;
+            }
+          }
+        }
+
+        if (separated) {
+          validSpawn = true;
+          break;
+        }
       }
     }
 
-    // Fallback: If no valid spawn point was found within maxAttempts
+    // Only spawn if a valid position is found
     if (!validSpawn) {
-      // 1. Clamp to world boundaries with margin
-      x = Phaser.Math.Clamp(x, margin, worldWidth - margin);
-      y = Phaser.Math.Clamp(y, margin, worldHeight - margin);
-
-      // 2. Ensure clamped position is outside the viewport
-      if (camera.worldView.contains(x, y)) {
-        // 3. Move spawn point to the nearest valid edge just outside the camera
-        const camLeft = camera.worldView.x;
-        const camRight = camera.worldView.right;
-        const camTop = camera.worldView.y;
-        const camBottom = camera.worldView.bottom;
-        const padding = 60; // Padding to ensure sprite spawns completely off-screen
-        const candidates = [];
-
-        // Left Candidate
-        const candidateLeftX = camLeft - padding;
-        if (candidateLeftX >= margin && candidateLeftX <= worldWidth - margin) {
-          candidates.push({ x: candidateLeftX, y: y, dist: Math.abs(x - candidateLeftX) });
-        }
-
-        // Right Candidate
-        const candidateRightX = camRight + padding;
-        if (candidateRightX >= margin && candidateRightX <= worldWidth - margin) {
-          candidates.push({ x: candidateRightX, y: y, dist: Math.abs(x - candidateRightX) });
-        }
-
-        // Top Candidate
-        const candidateTopY = camTop - padding;
-        if (candidateTopY >= margin && candidateTopY <= worldHeight - margin) {
-          candidates.push({ x: x, y: candidateTopY, dist: Math.abs(y - candidateTopY) });
-        }
-
-        // Bottom Candidate
-        const candidateBottomY = camBottom + padding;
-        if (candidateBottomY >= margin && candidateBottomY <= worldHeight - margin) {
-          candidates.push({ x: x, y: candidateBottomY, dist: Math.abs(y - candidateBottomY) });
-        }
-
-        // Select the closest valid candidate to minimize position snap
-        if (candidates.length > 0) {
-          candidates.sort((a, b) => a.dist - b.dist);
-          x = candidates[0].x;
-          y = candidates[0].y;
-        }
-      }
+      return null;
     }
 
     const EnemyClass = this.waveManager.getNextEnemyClass();
@@ -635,19 +693,69 @@ export default class GameScene extends Phaser.Scene {
     return enemy;
   }
 
-  spawnEnemyExplosion(x, y) {
+  spawnEnemyExplosion(x, y, enemyType = "worm") {
     const explosion = this.add.sprite(x, y, "explosion");
-    explosion.setScale(0.5);
     explosion.setDepth(y + 10);
     explosion.play("enemy-explosion");
+
+    // Add a slight random rotation to explosions
+    explosion.setAngle(Phaser.Math.Between(-15, 15));
+
+    // Explosion Scale Pop: FloatBetween(0.38, 0.45) base scale, pop by 1.15x
+    const baseScale = Phaser.Math.FloatBetween(0.38, 0.45);
+    explosion.setScale(baseScale);
+    this.tweens.add({
+      targets: explosion,
+      scale: baseScale * 1.15,
+      duration: 35,
+      yoyo: true
+    });
 
     // Play enemy death sound effect
     this.sound.play("enemy-die", { volume: 0.45 });
     this.sound.play("monster-death", { volume: 0.35 });
 
     explosion.once("animationcomplete", () => {
-      explosion.destroy();
+      if (explosion && explosion.active) {
+        explosion.destroy();
+      }
     });
+
+    // Camera Shake & Camera Zoom Punch
+    if (this.player && this.player.sprite) {
+      const distance = Phaser.Math.Distance.Between(x, y, this.player.sprite.x, this.player.sprite.y);
+
+      // Distance multiplier
+      let distMult = 0;
+      if (distance < 300) {
+        distMult = 1.0;
+      } else if (distance < 600) {
+        distMult = 0.5;
+      }
+
+      if (distMult > 0) {
+        const now = this.time.now;
+        // Throttle camera shake and zoom punch (maximum 1 action every 30ms)
+        if (now - (this.lastExplosionShakeTime || 0) >= 30) {
+          this.lastExplosionShakeTime = now;
+
+          // Determine shake parameters based on enemy size/type
+          const isBig = enemyType === "angler";
+          const duration = isBig ? 75 : 50;
+          const intensity = (isBig ? 0.0045 : 0.003) * distMult;
+
+          this.cameras.main.shake(duration, intensity);
+
+          // Camera Zoom Punch (zoom to 1.012, yoyo back in 30ms)
+          this.tweens.add({
+            targets: this.cameras.main,
+            zoom: 1.012,
+            duration: 30,
+            yoyo: true
+          });
+        }
+      }
+    }
   }
 
   handlePlayerEnemyCollision(playerSprite, enemySprite) {
@@ -815,7 +923,9 @@ export default class GameScene extends Phaser.Scene {
     // Spawn an initial burst of exactly 6 enemies at startup
     for (let i = 0; i < 6; i++) {
       const enemy = this.spawnEnemyNearPlayer();
-      this.enemies.push(enemy);
+      if (enemy) {
+        this.enemies.push(enemy);
+      }
     }
 
     // Spawn enemies periodically (capped at wave limit to prevent leaks)
@@ -827,7 +937,9 @@ export default class GameScene extends Phaser.Scene {
           const maxActive = this.waveManager.getMaxEnemies();
           if (this.enemies.length < maxActive) {
             const enemy = this.spawnEnemyNearPlayer();
-            this.enemies.push(enemy);
+            if (enemy) {
+              this.enemies.push(enemy);
+            }
           }
         } catch (err) {
           console.error("CRITICAL SPANNING ERROR:", err);

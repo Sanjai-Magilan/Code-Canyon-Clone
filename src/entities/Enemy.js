@@ -147,7 +147,7 @@ export default class Enemy {
       const deathY = this.sprite.y;
 
       if (typeof scene.spawnEnemyExplosion === "function") {
-        scene.spawnEnemyExplosion(deathX, deathY);
+        scene.spawnEnemyExplosion(deathX, deathY, this.sprite.texture.key);
       }
 
       const gunId = this.dropGunId();
