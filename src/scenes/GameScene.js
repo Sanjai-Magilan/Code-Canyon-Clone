@@ -33,6 +33,9 @@ import bullet from "../assets/Sprites/Guns/gun0/bullet.png";
 import ProjectileManager from "../systems/ProjectileManager";
 import PlayerShadow from "../assets/Sprites/Player/player-animation 1-000.png";
 import WeaponDropManager from "../systems/WeaponDropManager";
+import word2Text from "../assets/text/2-letter.txt";
+import word3Text from "../assets/text/3-letter.txt";
+import word4Text from "../assets/text/4-letter.txt";
 
 import gunDrop1 from "../assets/Sprites/Guns/guns drop/gun-001.png";
 import gunDrop2 from "../assets/Sprites/Guns/guns drop/gun-002.png";
@@ -158,6 +161,11 @@ export default class GameScene extends Phaser.Scene {
       frameHeight: 200
     });
     this.load.audio("power-up", powerUpAudio);
+
+    // Preload word text files
+    this.load.text("word-2", word2Text);
+    this.load.text("word-3", word3Text);
+    this.load.text("word-4", word4Text);
   }
 
   create() {
@@ -174,6 +182,20 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.bg = this.add.tileSprite(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, "bg");
     this.bg.setDepth(-100);
+
+    // Parse preloaded word lists
+    this.wordsCache = {
+      2: this.parseWordList(this.cache.text.get("word-2")),
+      3: this.parseWordList(this.cache.text.get("word-3")),
+      4: this.parseWordList(this.cache.text.get("word-4"))
+    };
+
+    this.activeWords = new Set();
+    this.wordQueues = {};
+    this.typingTarget = null;
+
+    // Register global keyboard keydown listener for typing combat
+    this.input.keyboard.on("keydown", this.handleTypingInput, this);
 
     // Initialize player with a specific character configuration key (e.g. "soldier")
     this.player = new Player(this, worldWidth / 2, worldHeight / 2, "soldier");
@@ -427,15 +449,7 @@ export default class GameScene extends Phaser.Scene {
     // Keyboard activation (Q key)
     this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
-    this.input.on("pointerdown", (pointer, currentlyOver) => {
-      if (!this.gameStarted) return;
-      if (currentlyOver && currentlyOver.length > 0) {
-        if (currentlyOver.includes(this.lightningIcon)) {
-          return;
-        }
-      }
-      this.player.shoot();
-    });
+    // pointerdown click shooting removed for typing combat
 
     // Start Screen / Play Button initialization
     this.gameStarted = false;
@@ -474,7 +488,7 @@ export default class GameScene extends Phaser.Scene {
       // Dynamically adjust spawn delay based on current wave configuration
       if (this.spawnTimerEvent) {
         this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
-      }z
+      }
 
       // Check if a wave has completed (transitioned to a new wave ID)
       const activeWaveConfig = this.waveManager.getCurrentWaveConfig();
@@ -573,6 +587,13 @@ export default class GameScene extends Phaser.Scene {
             enemy.sprite.body.velocity.x += (repelX / count) * strength;
             enemy.sprite.body.velocity.y += (repelY / count) * strength;
           }
+        }
+      }
+
+      // Always update positions of all enemy word labels
+      for (const enemy of this.enemies) {
+        if (enemy && typeof enemy.updateWordSpritesPosition === "function") {
+          enemy.updateWordSpritesPosition();
         }
       }
 
@@ -1266,6 +1287,133 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Helper to parse loaded text file contents into clean word arrays.
+   */
+  parseWordList(text) {
+    if (!text) return [];
+    return text.split(/\r?\n/)
+      .map(word => word.trim().toLowerCase())
+      .filter(word => word.length > 0);
+  }
+
+  /**
+   * Selects correct cached list based on wave number.
+   */
+  getWordListForWave(waveNumber) {
+    if (waveNumber === 1) return this.wordsCache[2] || [];
+    if (waveNumber === 2) return this.wordsCache[3] || [];
+    return this.wordsCache[4] || [];
+  }
+
+  /**
+   * Dequeues a unique word from the current wave queue.
+   */
+  getUniqueWordForEnemy() {
+    const wave = this.currentWaveId || 1;
+    let list = this.getWordListForWave(wave);
+    if (!list || list.length === 0) {
+      list = ["go", "run", "hit"]; // fallback
+    }
+
+    if (!this.wordQueues) {
+      this.wordQueues = {};
+    }
+
+    if (!this.wordQueues[wave] || this.wordQueues[wave].length === 0) {
+      this.wordQueues[wave] = Phaser.Utils.Array.Shuffle([...list]);
+    }
+
+    let word = this.wordQueues[wave].shift();
+    let attempts = 0;
+    while (this.activeWords.has(word) && attempts < 50) {
+      this.wordQueues[wave].push(word);
+      word = this.wordQueues[wave].shift();
+      attempts++;
+    }
+
+    this.activeWords.add(word);
+    return word;
+  }
+
+  /**
+   * Processes keyboard letter keydown inputs for typing combat.
+   */
+  handleTypingInput(event) {
+    if (!this.gameStarted || !this.player || this.player.isDead) return;
+
+    const char = event.key.toLowerCase();
+    if (char.length !== 1 || char < "a" || char > "z") return;
+
+    if (this.typingTarget) {
+      if (!this.typingTarget.sprite || !this.typingTarget.sprite.active || this.typingTarget.isDead) {
+        this.typingTarget = null;
+      }
+    }
+
+    if (!this.typingTarget) {
+      // Find visible active enemies whose next required letter matches char
+      const view = this.cameras.main.worldView;
+      const candidates = this.enemies.filter(enemy => {
+        if (!enemy || !enemy.sprite || !enemy.sprite.active || enemy.isDead) return false;
+        
+        const isVisible = view.contains(enemy.sprite.x, enemy.sprite.y);
+        if (!isVisible) return false;
+
+        const nextChar = enemy.assignedWord[enemy.currentLetterIndex].toLowerCase();
+        return nextChar === char;
+      });
+
+      if (candidates.length === 0) return;
+
+      // Lock onto the closest candidate to the player
+      let closestEnemy = candidates[0];
+      let minDist = Phaser.Math.Distance.Between(
+        this.player.getSprite().x,
+        this.player.getSprite().y,
+        closestEnemy.sprite.x,
+        closestEnemy.sprite.y
+      );
+
+      for (let i = 1; i < candidates.length; i++) {
+        const dist = Phaser.Math.Distance.Between(
+          this.player.getSprite().x,
+          this.player.getSprite().y,
+          candidates[i].sprite.x,
+          candidates[i].sprite.y
+        );
+        if (dist < minDist) {
+          minDist = dist;
+          closestEnemy = candidates[i];
+        }
+      }
+
+      this.typingTarget = closestEnemy;
+    }
+
+    const nextChar = this.typingTarget.assignedWord[this.typingTarget.currentLetterIndex].toLowerCase();
+    if (char === nextChar) {
+      this.typingTarget.advanceProgress();
+    }
+  }
+
+  /**
+   * Rotates player and fires a target-locked completion bullet.
+   */
+  fireCompletionBullet(target) {
+    if (!target || !this.player) return;
+
+    const playerSprite = this.player.getSprite();
+    const angle = Phaser.Math.Angle.Between(
+      playerSprite.x,
+      playerSprite.y,
+      target.sprite.x,
+      target.sprite.y
+    );
+
+    this.player.shootToward(angle, target);
+  }
+
+  /**
    * Cleans up scene resources, timers, listeners, and global sound states on shutdown/restart.
    */
   shutdown() {
@@ -1275,6 +1423,12 @@ export default class GameScene extends Phaser.Scene {
     this.clearWeaponPowerup();
     this.clearShieldPowerup();
     this.resetLightningPower();
+
+    if (this.activeWords) {
+      this.activeWords.clear();
+    }
+    this.wordQueues = {};
+    this.typingTarget = null;
 
     if (this.lightningIcon) {
       this.lightningIcon.destroy();
@@ -1342,5 +1496,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Remove input listeners
     this.input.off("pointerdown");
+    this.input.keyboard.off("keydown", this.handleTypingInput, this);
   }
 }
