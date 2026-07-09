@@ -58,8 +58,19 @@ export default class Enemy {
     this.health = this.maxHealth;
     this.isDead = false;
 
+    // --- Typing Combat System State ---
+    this.assignedWord = scene.getUniqueWordForEnemy();
+    this.currentLetterIndex = 0;
+    this.virtualLetterIndex = 0;
+    this.typedProgress = "";
+    this.remainingLetters = this.assignedWord;
+
+    // Create label sprites above the enemy using sprite font "hud-font"
+    this.wordSprites = [];
+    this.createWordSprites();
+
     // Attach memory leak protection event on destroy
-    this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
+    this.sprite.on(Phaser.GameObjects.Events.DESTROY, () => this.destroy(true));
   }
 
   /**
@@ -92,6 +103,8 @@ export default class Enemy {
     this.shadow.x = this.sprite.x + shadowOffsetX;
     this.shadow.y = this.sprite.y + this.shadowConfig.updateOffsetY;
     this.shadow.setFlipX(movingLeft);
+
+    this.updateWordSpritesPosition();
   }
 
   /**
@@ -131,6 +144,19 @@ export default class Enemy {
     this.isDead = true;
 
     const scene = this.scene;
+
+    // Clear typing target lock
+    if (scene && scene.typingTarget === this) {
+      scene.typingTarget = null;
+    }
+
+    // Immediately destroy all hovering letter sprites
+    if (this.wordSprites) {
+      this.wordSprites.forEach(sprite => {
+        if (sprite) sprite.destroy();
+      });
+      this.wordSprites = [];
+    }
 
     // Call scene onEnemyKilled hook to register kill streak progress
     if (scene && typeof scene.onEnemyKilled === "function") {
@@ -187,12 +213,107 @@ export default class Enemy {
   }
 
   /**
-   * Destroys visual shadow elements and detaches listeners.
+   * Spawns sprites representing the characters of the assigned word.
    */
-  destroy() {
+  createWordSprites() {
+    const scene = this.scene;
+    const word = this.assignedWord.toUpperCase();
+    const letterSpacing = 40; // horizontal spacing between characters
+    const totalWidth = (word.length - 1) * letterSpacing;
+    const startX = -totalWidth / 2;
+
+    for (let i = 0; i < word.length; i++) {
+      const charCode = word.charCodeAt(i) - 65; // A = 65
+      const frame = (charCode >= 0 && charCode <= 25) ? charCode : 0;
+
+      const sprite = scene.add.sprite(this.sprite.x + startX + i * letterSpacing, this.sprite.y - 85, "hud-font");
+      sprite.setFrame(frame);
+      sprite.setScale(0.24);
+      sprite.setDepth(this.sprite.depth + 100);
+      sprite.setTint(0xffffff); // Initial untyped state (white)
+
+      this.wordSprites.push(sprite);
+    }
+  }
+
+  /**
+   * Updates coordinates of the word label to follow the enemy.
+   */
+  updateWordSpritesPosition() {
+    if (!this.sprite || !this.sprite.active) return;
+    const word = this.assignedWord;
+    const letterSpacing = 40;
+    const totalWidth = (word.length - 1) * letterSpacing;
+    const startX = -totalWidth / 2;
+
+    for (let i = 0; i < this.wordSprites.length; i++) {
+      const sprite = this.wordSprites[i];
+      if (sprite && sprite.active) {
+        sprite.x = this.sprite.x + startX + i * letterSpacing;
+        sprite.y = this.sprite.y - 85;
+        sprite.setDepth(this.sprite.depth + 100);
+      }
+    }
+  }
+
+  /**
+   * Advances the actual hit progress when a typed bullet hits.
+   */
+  advanceProgress() {
+    if (this.isDead) return;
+
+    this.currentLetterIndex++;
+    this.typedProgress = this.assignedWord.slice(0, this.currentLetterIndex);
+    this.remainingLetters = this.assignedWord.slice(this.currentLetterIndex);
+
+    // Apply green tint to successfully typed/hit characters, clear tint for untyped
+    for (let i = 0; i < this.wordSprites.length; i++) {
+      const sprite = this.wordSprites[i];
+      if (sprite && sprite.active) {
+        if (i < this.currentLetterIndex) {
+          sprite.setTint(0x00ff00);
+        } else {
+          sprite.setTint(0xffffff);
+        }
+      }
+    }
+
+    // Trigger completion bullet once the whole word is successfully typed
+    if (this.currentLetterIndex >= this.assignedWord.length) {
+      if (this.scene && typeof this.scene.fireCompletionBullet === "function") {
+        this.scene.fireCompletionBullet(this);
+      }
+      
+      // Clear target lock immediately upon completion
+      if (this.scene && this.scene.typingTarget === this) {
+        this.scene.typingTarget = null;
+      }
+    }
+  }
+
+  destroy(fromSpriteEvent = false) {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+
     if (this.shadow) {
       this.shadow.destroy();
       this.shadow = null;
+    }
+    if (this.wordSprites) {
+      this.wordSprites.forEach(sprite => {
+        if (sprite) sprite.destroy();
+      });
+      this.wordSprites = [];
+    }
+    if (this.scene && this.scene.activeWords && this.assignedWord) {
+      this.scene.activeWords.delete(this.assignedWord);
+    }
+    if (this.sprite) {
+      const sprite = this.sprite;
+      this.sprite = null;
+      if (!fromSpriteEvent) {
+        sprite.destroy();
+      }
     }
   }
 }

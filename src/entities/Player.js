@@ -63,6 +63,7 @@ export default class Player {
     this.canDash = true;
     this.lastDashTime = 0;
     this.lastMoveDirection = new Phaser.Math.Vector2(1, 0);
+    this.currentDirVector = new Phaser.Math.Vector2(0, 0);
 
     if (this.scene && this.scene.input && this.scene.input.keyboard) {
       this.spaceKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -175,16 +176,16 @@ export default class Player {
     const downDown =
       (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
 
-    // Calculate current movement direction vector
-    const currentDir = new Phaser.Math.Vector2(0, 0);
-    if (leftDown) currentDir.x = -1;
-    else if (rightDown) currentDir.x = 1;
+    // Calculate current movement direction vector using pre-allocated instance
+    this.currentDirVector.set(0, 0);
+    if (leftDown) this.currentDirVector.x = -1;
+    else if (rightDown) this.currentDirVector.x = 1;
 
-    if (upDown) currentDir.y = -1;
-    else if (downDown) currentDir.y = 1;
+    if (upDown) this.currentDirVector.y = -1;
+    else if (downDown) this.currentDirVector.y = 1;
 
-    if (currentDir.x !== 0 || currentDir.y !== 0) {
-      this.lastMoveDirection.copy(currentDir).normalize();
+    if (this.currentDirVector.x !== 0 || this.currentDirVector.y !== 0) {
+      this.lastMoveDirection.copy(this.currentDirVector).normalize();
     }
 
     // Handle horizontal movement
@@ -784,6 +785,93 @@ export default class Player {
     this.flash.play(flashConfig.anim);
 
     // Apply recoil parameters directly (zero dynamic allocations / tweens)
+    const recoilConfig = this.characterConfig.recoil;
+    this.recoilOffset = recoilConfig.offset;
+    this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;
+
+    // Play gun recoil/reload sound
+    this.scene.sound.play("recoil", { volume: 0.3 });
+
+    flashSprite.once("animationcomplete", () => {
+      flashSprite.destroy();
+      if (this.flash === flashSprite) {
+        this.flash = null;
+      }
+    });
+  }
+
+  /**
+   * Fires a projectile in the exact direction of the target enemy,
+   * setting the target locked references on the bullets.
+   * @param {number} angle trajectory angle in radians
+   * @param {object} targetEnemy the targeted Enemy instance
+   */
+  shootToward(angle, targetEnemy) {
+    if (this.isDead) return;
+    
+    // Rotate/flip player toward target
+    const isTargetLeft = targetEnemy.sprite.x < this.sprite.x;
+    this.sprite.setFlipX(isTargetLeft);
+
+    const muzzle = this.getMuzzlePosition();
+
+    // Delegate cooldown check and get spawn parameters using the exact angle
+    const shotInfo = this.weapon.fire(muzzle, angle);
+    if (!shotInfo) {
+      return;
+    }
+
+    // Check shot count limit for temporary weapons
+    if (this.tempWeaponMaxShots !== null) {
+      this.tempWeaponShotsFired++;
+
+      if (this.scene && typeof this.scene.updateWeaponPowerupUI === "function") {
+        this.scene.updateWeaponPowerupUI();
+      }
+
+      if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
+        this.scene.time.delayedCall(0, () => {
+          this.revertToDefaultWeapon();
+          this.showFeedbackText("Weapon Expired", "#ff4444");
+        });
+      }
+    }
+
+    // Play gun shoot sound effect
+    this.scene.sound.play("shoot", { volume: 0.4 });
+
+    // Hand off projectile spawning to the scene's ProjectileManager
+    if (this.scene.projectileManager) {
+      const parentVel = this.sprite.body ? { x: this.sprite.body.velocity.x, y: this.sprite.body.velocity.y } : { x: 0, y: 0 };
+      
+      // Inject target enemy and letter index into shotInfo details
+      if (Array.isArray(shotInfo)) {
+        shotInfo.forEach(shot => {
+          shot.targetEnemy = targetEnemy;
+          shot.targetLetterIndex = targetEnemy.currentLetterIndex;
+        });
+      } else if (shotInfo) {
+        shotInfo.targetEnemy = targetEnemy;
+        shotInfo.targetLetterIndex = targetEnemy.currentLetterIndex;
+      }
+      this.scene.projectileManager.spawn(shotInfo, false, parentVel);
+    }
+
+    // Render visual effects and muzzle flash
+    if (this.flash && this.flash.active) {
+      this.flash.destroy();
+    }
+
+    const flashConfig = this.characterConfig.muzzleFlash;
+    const flashSprite = this.scene.add.sprite(muzzle.x, muzzle.y, flashConfig.texture);
+    this.flash = flashSprite;
+
+    this.flash.setScale(flashConfig.scale);
+    this.flash.setDepth(this.gun.depth + 1);
+    this.flash.setFlipX(this.sprite.flipX);
+    this.flash.play(flashConfig.anim);
+
+    // Apply recoil parameters directly
     const recoilConfig = this.characterConfig.recoil;
     this.recoilOffset = recoilConfig.offset;
     this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;

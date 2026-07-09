@@ -82,6 +82,11 @@ export default class ProjectileManager {
       if (info.bulletTexture) {
         bullet.setTexture(info.bulletTexture);
       }
+      
+      // Inject typing targets onto the bullet instance
+      bullet.targetEnemy = info.targetEnemy || null;
+      bullet.targetLetterIndex = info.targetLetterIndex !== undefined ? info.targetLetterIndex : null;
+
       bullet.fire(
         info.x,
         info.y,
@@ -139,19 +144,37 @@ export default class ProjectileManager {
       return;
     }
 
+    // Find the corresponding Enemy class wrapper
+    const scene = this.scene;
+    const index = scene.enemies.findIndex((e) => e.sprite === enemySprite);
+    if (index === -1) {
+      bullet.deactivate();
+      return;
+    }
+
+    const enemy = scene.enemies[index];
+
+    // If this is a typed bullet, it MUST ONLY hit its specific target enemy
+    if (bullet.targetEnemy && bullet.targetEnemy !== enemy) {
+      // Bullet ignores this enemy and passes through
+      return;
+    }
+
     const damage = bullet.damage !== undefined ? bullet.damage : 50;
     bullet.deactivate(); // Recycle bullet to the pool
 
     if (bullet.texture && bullet.texture.key === "bullet_gun5") {
-      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage);
+      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage, bullet.targetEnemy);
       return;
     }
 
-    // Find and apply damage to the corresponding Enemy class wrapper
-    const scene = this.scene;
-    const index = scene.enemies.findIndex((e) => e.sprite === enemySprite);
-    if (index !== -1) {
-      const enemy = scene.enemies[index];
+    // Advance typing progress on target hit
+    if (bullet.targetEnemy) {
+      if (typeof enemy.advanceProgress === "function") {
+        enemy.advanceProgress();
+      }
+    } else {
+      // Fallback for any non-typed damage (if any exist)
       if (typeof enemy.takeDamage === "function") {
         enemy.takeDamage(damage);
       } else {
@@ -169,33 +192,18 @@ export default class ProjectileManager {
    * @param {number} y Y coordinate of explosion
    * @param {number} damage Damage value to apply
    */
-  triggerExplosionDamage(x, y, damage) {
+  triggerExplosionDamage(x, y, damage, targetEnemy = null) {
     try {
-      const radius = 150; // Big diameter of 300px
       const scene = this.scene;
 
-      // Visual explosion effect
+      // Visual explosion effect only
       if (typeof scene.spawnEnemyExplosion === "function") {
         scene.spawnEnemyExplosion(x, y);
       }
 
-      // Clone enemies array to prevent modifications during iteration
-      const targets = [...scene.enemies];
-      for (let i = 0; i < targets.length; i++) {
-        const enemy = targets[i];
-        if (!enemy || !enemy.sprite || !enemy.sprite.active) continue;
-
-        const dist = Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y);
-        if (dist <= radius) {
-          if (typeof enemy.takeDamage === "function") {
-            enemy.takeDamage(damage);
-          } else {
-            enemy.health -= damage;
-            if (enemy.health <= 0) {
-              enemy.die();
-            }
-          }
-        }
+      // If we have a target enemy, let it advance its progress
+      if (targetEnemy && typeof targetEnemy.advanceProgress === "function") {
+        targetEnemy.advanceProgress();
       }
     } catch (err) {
       console.error("CRITICAL EXPLOSION ERROR:", err);

@@ -57,6 +57,8 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    */
   deactivate() {
     this.disableBody(true, true);
+    this.targetEnemy = null;
+    this.targetLetterIndex = null;
   }
 
   update() {
