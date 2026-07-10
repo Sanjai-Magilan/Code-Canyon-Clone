@@ -57,8 +57,13 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    * @returns {boolean}
    */
   get isFinalTypingShot() {
-    if (!this.targetEnemy || !this.targetEnemy.assignedWord) return false;
-    return this.targetLetterIndex !== null && this.targetLetterIndex >= this.targetEnemy.assignedWord.length;
+    if (!this.targetEnemy?.assignedWord) {
+      return false;
+    }
+    return (
+      this.targetLetterIndex !== null &&
+      this.targetLetterIndex >= this.targetEnemy.assignedWord.length
+    );
   }
 
   /**

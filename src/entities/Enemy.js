@@ -146,7 +146,7 @@ export default class Enemy {
     const scene = this.scene;
 
     // Clear typing target lock
-    if (scene && scene.typingTarget === this) {
+    if (scene?.typingTarget === this) {
       scene.typingTarget = null;
     }
 
@@ -168,7 +168,7 @@ export default class Enemy {
       scene.enemies.splice(index, 1);
     }
 
-    if (this.sprite && this.sprite.active) {
+    if (this.sprite?.active) {
       const deathX = this.sprite.x;
       const deathY = this.sprite.y;
 
@@ -248,7 +248,7 @@ export default class Enemy {
 
     for (let i = 0; i < this.wordSprites.length; i++) {
       const sprite = this.wordSprites[i];
-      if (sprite && sprite.active) {
+      if (sprite?.active) {
         sprite.x = this.sprite.x + startX + i * letterSpacing;
         sprite.y = this.sprite.y - 85;
         sprite.setDepth(this.sprite.depth + 100);
@@ -283,7 +283,7 @@ export default class Enemy {
     // Apply green tint to successfully typed/hit characters, clear tint for untyped
     for (let i = 0; i < this.wordSprites.length; i++) {
       const sprite = this.wordSprites[i];
-      if (sprite && sprite.active) {
+      if (sprite?.active) {
         if (i < this.currentLetterIndex) {
           sprite.setTint(0x00ff00);
         } else {
@@ -299,7 +299,7 @@ export default class Enemy {
       }
       
       // Clear target lock immediately upon completion
-      if (this.scene && this.scene.typingTarget === this) {
+      if (this.scene?.typingTarget === this) {
         this.scene.typingTarget = null;
       }
     }
@@ -319,8 +319,8 @@ export default class Enemy {
       });
       this.wordSprites = [];
     }
-    if (this.scene && this.scene.activeWords && this.assignedWord) {
-      this.scene.activeWords.delete(this.assignedWord);
+    if (this.assignedWord) {
+      this.scene?.activeWords?.delete(this.assignedWord);
     }
     if (this.sprite) {
       const sprite = this.sprite;

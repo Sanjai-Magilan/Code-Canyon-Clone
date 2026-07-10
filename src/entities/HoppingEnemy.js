@@ -1,6 +1,5 @@
 import Enemy from "./Enemy";
 import Phaser from "phaser";
-import ENEMY_CONFIG from "../config/enemyConfig";
 
 export default class HoppingEnemy extends Enemy {
   /**
@@ -90,7 +89,7 @@ export default class HoppingEnemy extends Enemy {
       duration: this.hoppingConfig.jumpDuration,
       ease: "Linear",
       onStart: () => {
-        if (this.sprite && this.sprite.active) {
+        if (this.sprite?.active) {
           this.sprite.play(this.animKey);
         }
       },

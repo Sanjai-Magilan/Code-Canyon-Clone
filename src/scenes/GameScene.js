@@ -14,9 +14,7 @@ import playerOofAudio from "../assets/Sounds/player/playerOof.webm";
 import waveCompletedAudio from "../assets/Sounds/level completed/levelCompleted.webm";
 import CAMERA_CONFIG from "../config/cameraConfig";
 import WORLD_CONFIG from "../config/worldConfig";
-import CHARACTERS from "../config/characterConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
-import BULLET_CONFIG from "../config/bulletConfig";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import explosionSheet from "../assets/Sprites/Enemy/explosion/explosion-sheet.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
@@ -502,7 +500,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Check if a wave has completed (transitioned to a new wave ID)
     const activeWaveConfig = this.waveManager.getCurrentWaveConfig();
-    if (activeWaveConfig && activeWaveConfig.id !== this.currentWaveId) {
+    if (activeWaveConfig?.id !== this.currentWaveId) {
       this.sound.play("wave-completed", { volume: 0.5 });
       this.currentWaveId = activeWaveConfig.id;
       this.showWavePopup(activeWaveConfig.id);
@@ -659,20 +657,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   spawnEnemyNearPlayer() {
-    const view = this.cameras.main.worldView;
-    const visibleEnemies = this.enemies.filter(enemy => {
-      return (
-        enemy &&
-        enemy.sprite &&
-        enemy.sprite.active &&
-        view.contains(
-          enemy.sprite.x,
-          enemy.sprite.y
-        )
-      );
-    });
-
-    if (visibleEnemies.length >= 5) {
+    if (this.countVisibleEnemies() >= 5) {
       return null;
     }
 
@@ -681,75 +666,93 @@ export default class GameScene extends Phaser.Scene {
     const margin = ENEMY_CONFIG.spawn.margin;
     const worldWidth = WORLD_CONFIG.width;
     const worldHeight = WORLD_CONFIG.height;
-    const camera = this.cameras.main;
 
-    let x = 0;
-    let y = 0;
-    let validSpawn = false;
+    const isMoving = player.body?.velocity.lengthSq() > 100;
+    const baseAngle = this.getSpawnBaseAngle(isMoving);
 
-    // Check if player is moving to determine spawn direction
-    const isMoving = player.body && player.body.velocity.lengthSq() > 100;
-    let baseAngle = 0;
-    if (isMoving && this.player && this.player.lastMoveDirection) {
-      baseAngle = Math.atan2(
-        this.player.lastMoveDirection.y,
-        this.player.lastMoveDirection.x
-      );
-    }
+    const spawnPos = this.findSpawnCoordinates(
+      player,
+      isMoving,
+      baseAngle,
+      distance,
+      margin,
+      worldWidth,
+      worldHeight
+    );
 
-    // Try up to 10 attempts to find a valid spawn position (min 120px separation)
-    for (let attempt = 0; attempt < 10; attempt++) {
-      let angle;
-      if (isMoving && this.player && this.player.lastMoveDirection) {
-        // Spawn within a cone in front of the player (120 degrees size)
-        angle = baseAngle + Phaser.Math.FloatBetween(-Math.PI / 3, Math.PI / 3);
-      } else {
-        angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-      }
-
-      x = player.x + Math.cos(angle) * distance;
-      y = player.y + Math.sin(angle) * distance;
-
-      const outsideScreen = !camera.worldView.contains(x, y);
-      const withinBounds = (
-        x >= margin &&
-        x <= worldWidth - margin &&
-        y >= margin &&
-        y <= worldHeight - margin
-      );
-
-      if (withinBounds && outsideScreen) {
-        // Separation check: min 120px from other active enemies
-        let separated = true;
-        for (const enemy of this.enemies) {
-          if (enemy && enemy.sprite && enemy.sprite.active) {
-            const dist = Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y);
-            if (dist < 120) {
-              separated = false;
-              break;
-            }
-          }
-        }
-
-        if (separated) {
-          validSpawn = true;
-          break;
-        }
-      }
-    }
-
-    // Only spawn if a valid position is found
-    if (!validSpawn) {
+    if (!spawnPos) {
       return null;
     }
 
     const EnemyClass = this.waveManager.getNextEnemyClass();
-    const enemy = new EnemyClass(this, x, y);
+    const enemy = new EnemyClass(this, spawnPos.x, spawnPos.y);
     
-    // Add enemy sprite to the physics group so collision handles it
     this.enemiesGroup.add(enemy.sprite);
 
     return enemy;
+  }
+
+  countVisibleEnemies() {
+    const view = this.cameras.main.worldView;
+    return this.enemies.filter(enemy => 
+      enemy?.sprite?.active && view.contains(enemy.sprite.x, enemy.sprite.y)
+    ).length;
+  }
+
+  getSpawnBaseAngle(isMoving) {
+    if (isMoving && this.player?.lastMoveDirection) {
+      return Math.atan2(
+        this.player.lastMoveDirection.y,
+        this.player.lastMoveDirection.x
+      );
+    }
+    return 0;
+  }
+
+  getCandidateAngle(isMoving, baseAngle) {
+    if (isMoving && this.player?.lastMoveDirection) {
+      return baseAngle + Phaser.Math.FloatBetween(-Math.PI / 3, Math.PI / 3);
+    }
+    return Phaser.Math.FloatBetween(0, Math.PI * 2);
+  }
+
+  isPositionValidForSpawn(x, y, margin, worldWidth, worldHeight) {
+    const camera = this.cameras.main;
+    const outsideScreen = !camera.worldView.contains(x, y);
+    const withinBounds = (
+      x >= margin &&
+      x <= worldWidth - margin &&
+      y >= margin &&
+      y <= worldHeight - margin
+    );
+    return withinBounds && outsideScreen;
+  }
+
+  isPositionSeparated(x, y) {
+    for (const enemy of this.enemies) {
+      if (enemy?.sprite?.active) {
+        const dist = Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y);
+        if (dist < 120) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  findSpawnCoordinates(player, isMoving, baseAngle, distance, margin, worldWidth, worldHeight) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const angle = this.getCandidateAngle(isMoving, baseAngle);
+      const x = player.x + Math.cos(angle) * distance;
+      const y = player.y + Math.sin(angle) * distance;
+
+      if (this.isPositionValidForSpawn(x, y, margin, worldWidth, worldHeight)) {
+        if (this.isPositionSeparated(x, y)) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
   }
 
   spawnEnemyExplosion(x, y, enemyType = "worm") {
@@ -775,13 +778,13 @@ export default class GameScene extends Phaser.Scene {
     this.sound.play("monster-death", { volume: 0.35 });
 
     explosion.once("animationcomplete", () => {
-      if (explosion && explosion.active) {
+      if (explosion?.active) {
         explosion.destroy();
       }
     });
 
     // Camera Shake & Camera Zoom Punch
-    if (this.player && this.player.sprite) {
+    if (this.player?.sprite) {
       const distance = Phaser.Math.Distance.Between(x, y, this.player.sprite.x, this.player.sprite.y);
 
       // Distance multiplier
@@ -1143,7 +1146,7 @@ export default class GameScene extends Phaser.Scene {
       return POWERUP_ICON_SCALE[iconKey];
     }
     // If it is a gun texture key, default to defaultGun scale
-    if (iconKey && iconKey.startsWith("drop_")) {
+    if (iconKey?.startsWith("drop_")) {
       return POWERUP_ICON_SCALE.defaultGun;
     }
     // Standard default scale for any other power-up
@@ -1266,7 +1269,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Find all enemies on screen
     const visibleEnemies = this.enemies.filter(enemy => 
-      enemy && enemy.sprite && enemy.sprite.active &&
+      enemy?.sprite?.active &&
       view.contains(enemy.sprite.x, enemy.sprite.y)
     );
 
@@ -1512,12 +1515,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Clean up health pickups group
-    if (this.healthPickups && this.healthPickups.children && this.healthPickups.children.entries) {
+    if (this.healthPickups?.children?.entries) {
       this.healthPickups.clear(true, true);
     }
 
     // Clean up shield pickups group
-    if (this.shieldPickups && this.shieldPickups.children && this.shieldPickups.children.entries) {
+    if (this.shieldPickups?.children?.entries) {
       this.shieldPickups.clear(true, true);
     }
 

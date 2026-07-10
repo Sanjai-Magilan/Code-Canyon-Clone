@@ -1,4 +1,3 @@
-import Phaser from "phaser";
 import DroppedWeapon from "../entities/DroppedWeapon";
 
 export default class WeaponDropManager {

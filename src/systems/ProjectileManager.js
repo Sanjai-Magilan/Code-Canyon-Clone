@@ -161,7 +161,7 @@ export default class ProjectileManager {
     const damage = bullet.damage !== undefined ? bullet.damage : 50;
     bullet.deactivate(); // Recycle bullet to the pool
 
-    if (bullet.texture && bullet.texture.key === "bullet_gun5") {
+    if (bullet.texture?.key === "bullet_gun5") {
       this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage, bullet.targetEnemy);
       return;
     }

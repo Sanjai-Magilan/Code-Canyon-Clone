@@ -107,7 +107,7 @@ export default class RangedEnemy extends Enemy {
       // 5 & 6. Stop movement for a brief firing duration, then resume chasing
       this.scene.time.delayedCall(300, () => {
         this.isShooting = false;
-        if (this.sprite && this.sprite.active) {
+        if (this.sprite?.active) {
           this.sprite.play(this.animKey);
         }
       });

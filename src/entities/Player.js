@@ -154,10 +154,10 @@ export default class Player {
     let isMoving = false;
 
     // Read movements from arrow keys (cursors) ONLY (disable WASD to prevent typing conflict)
-    const leftDown = cursors && cursors.left.isDown;
-    const rightDown = cursors && cursors.right.isDown;
-    const upDown = cursors && cursors.up.isDown;
-    const downDown = cursors && cursors.down.isDown;
+    const leftDown = cursors?.left?.isDown;
+    const rightDown = cursors?.right?.isDown;
+    const upDown = cursors?.up?.isDown;
+    const downDown = cursors?.down?.isDown;
 
     // Calculate current movement direction vector using pre-allocated instance
     this.currentDirVector.set(0, 0);
@@ -256,7 +256,7 @@ export default class Player {
     // Sync flip states
     this.head.setFlipX(this.sprite.flipX);
     this.gun.setFlipX(this.sprite.flipX);
-    if (this.flash && this.flash.active) {
+    if (this.flash?.active) {
       const muzzle = this.getMuzzlePosition();
       this.flash.setPosition(muzzle.x, muzzle.y);
       this.flash.setFlipX(this.sprite.flipX);
@@ -371,7 +371,7 @@ export default class Player {
     // End dash after duration
     this.dashTimer = this.scene.time.delayedCall(PLAYER_CONFIG.dash.duration, () => {
       this.isDashing = false;
-      if (this.sprite && this.sprite.body) {
+      if (this.sprite?.body) {
         this.sprite.setVelocity(0, 0);
         this.sprite.setAlpha(1.0);
       }
@@ -737,7 +737,7 @@ export default class Player {
     }
 
     // Render visual effects and muzzle flash
-    if (this.flash && this.flash.active) {
+    if (this.flash?.active) {
       this.flash.destroy();
     }
 
@@ -825,7 +825,7 @@ export default class Player {
     }
 
     // Render visual effects and muzzle flash
-    if (this.flash && this.flash.active) {
+    if (this.flash?.active) {
       this.flash.destroy();
     }
 
