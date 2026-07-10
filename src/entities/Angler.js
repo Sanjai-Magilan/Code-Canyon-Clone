@@ -10,17 +10,17 @@ export default class Angler extends HoppingEnemy {
    */
   constructor(scene, x, y) {
     // Inherit hopping behavior using Angler visual and movement configurations
-    super(
+    super({
       scene,
       x,
       y,
-      "angler",
-      "angler-run",
-      "worm-shadow",
-      0, // Speed is unused for continuous velocity
-      ANGLER_CONFIG.scale,
-      ANGLER_CONFIG.shadow,
-      ANGLER_CONFIG
-    );
+      texture: "angler",
+      animKey: "angler-run",
+      shadowKey: "worm-shadow",
+      speed: 0, // Speed is unused for continuous velocity
+      scale: ANGLER_CONFIG.scale,
+      shadowConfig: ANGLER_CONFIG.shadow,
+      hoppingConfig: ANGLER_CONFIG
+    });
   }
 }

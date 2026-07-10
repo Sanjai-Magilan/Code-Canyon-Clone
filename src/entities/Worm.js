@@ -10,16 +10,16 @@ export default class Worm extends Enemy {
    */
   constructor(scene, x, y) {
     // Inherit base physics and AI movement using Worm visual configurations
-    super(
+    super({
       scene,
       x,
       y,
-      "worm",
-      "worm-run",
-      "worm-shadow",
-      ENEMY_CONFIG.speed,
-      ENEMY_CONFIG.scale,
-      ENEMY_CONFIG.shadow
-    );
+      texture: "worm",
+      animKey: "worm-run",
+      shadowKey: "worm-shadow",
+      speed: ENEMY_CONFIG.speed,
+      scale: ENEMY_CONFIG.scale,
+      shadowConfig: ENEMY_CONFIG.shadow
+    });
   }
 }

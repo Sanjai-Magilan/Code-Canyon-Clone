@@ -14,19 +14,19 @@ export default class RangedEnemy extends Enemy {
    * @param {string} shadowKey Shadow image key
    * @param {object} rangedConfig Configuration object containing stats and tolerances
    */
-  constructor(scene, x, y, texture, animKey, shadowKey, rangedConfig) {
+  constructor({ scene, x, y, texture, animKey, shadowKey, rangedConfig }) {
     // Call generic Enemy constructor to set up pathing, base sprite, and shadow configs
-    super(
+    super({
       scene,
       x,
       y,
       texture,
       animKey,
       shadowKey,
-      rangedConfig.speed,
-      rangedConfig.scale,
-      rangedConfig.shadow
-    );
+      speed: rangedConfig.speed,
+      scale: rangedConfig.scale,
+      shadowConfig: rangedConfig.shadow
+    });
 
     this.rangedConfig = rangedConfig;
     this.animKey = animKey;

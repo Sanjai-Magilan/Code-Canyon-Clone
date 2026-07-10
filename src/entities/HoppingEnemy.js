@@ -16,7 +16,7 @@ export default class HoppingEnemy extends Enemy {
    * @param {object} shadowConfig Shadow positioning offsets
    * @param {object} hoppingConfig Hopping parameters (jumpDistance, jumpDuration, jumpCooldown, jumpHeight)
    */
-  constructor(
+  constructor({
     scene,
     x,
     y,
@@ -27,8 +27,8 @@ export default class HoppingEnemy extends Enemy {
     scale,
     shadowConfig,
     hoppingConfig
-  ) {
-    super(scene, x, y, texture, animKey, shadowKey, speed, scale, shadowConfig);
+  }) {
+    super({ scene, x, y, texture, animKey, shadowKey, speed, scale, shadowConfig });
 
     this.hoppingConfig = hoppingConfig;
     this.animKey = animKey;
@@ -147,9 +147,7 @@ export default class HoppingEnemy extends Enemy {
    * Clean up tweens to prevent memory leaks and exceptions upon destruction.
    */
   destroy() {
-    if (this.scene && this.scene.tweens) {
-      this.scene.tweens.killTweensOf(this);
-    }
+    this.scene?.tweens?.killTweensOf(this);
     super.destroy();
   }
 }

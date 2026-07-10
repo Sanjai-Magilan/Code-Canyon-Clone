@@ -10,6 +10,14 @@ export default class Crab extends RangedEnemy {
    */
   constructor(scene, x, y) {
     // Inherit base ranged enemy behavior and weapon capabilities
-    super(scene, x, y, "crab", "crab-run", "worm-shadow", CRAB_CONFIG);
+    super({
+      scene,
+      x,
+      y,
+      texture: "crab",
+      animKey: "crab-run",
+      shadowKey: "worm-shadow",
+      rangedConfig: CRAB_CONFIG
+    });
   }
 }

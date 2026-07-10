@@ -44,9 +44,7 @@ export default class WeaponDropManager {
    */
   handlePlayerPickup(playerSprite, pickup) {
     // Equip the temporary weapon on the player
-    if (this.scene.player && typeof this.scene.player.equipTemporaryWeapon === "function") {
-      this.scene.player.equipTemporaryWeapon(pickup.gunId);
-    }
+    this.scene.player?.equipTemporaryWeapon?.(pickup.gunId);
     
     // Remove pickup from the map
     pickup.destroy();

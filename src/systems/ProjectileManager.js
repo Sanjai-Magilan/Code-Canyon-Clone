@@ -87,17 +87,17 @@ export default class ProjectileManager {
       bullet.targetEnemy = info.targetEnemy || null;
       bullet.targetLetterIndex = info.targetLetterIndex !== undefined ? info.targetLetterIndex : null;
 
-      bullet.fire(
-        info.x,
-        info.y,
-        info.angle,
-        info.bulletSpeed,
-        info.bulletScale,
-        info.bulletLifetime,
+      bullet.fire({
+        x: info.x,
+        y: info.y,
+        angle: info.angle,
+        speed: info.bulletSpeed,
+        scale: info.bulletScale,
+        lifetime: info.bulletLifetime,
         parentVelocity,
-        info.velocityInheritanceFactor,
-        info.bulletDamage
-      );
+        inheritanceFactor: info.velocityInheritanceFactor,
+        damage: info.bulletDamage
+      });
     }
   }
 
@@ -119,7 +119,7 @@ export default class ProjectileManager {
       bullet.deactivate(); // Recycle bullet to pool
     } else {
       // Fallback: deactivate whichever is not the player sprite
-      const playerSprite = this.scene.player ? this.scene.player.getSprite() : null;
+      const playerSprite = this.scene.player?.getSprite() || null;
       if (arg1 && arg1 !== playerSprite && typeof arg1.disableBody === "function") {
         arg1.disableBody(true, true);
       } else if (arg2 && arg2 !== playerSprite && typeof arg2.disableBody === "function") {
@@ -128,9 +128,7 @@ export default class ProjectileManager {
     }
 
     // Deal damage to the Player wrapper in the scene
-    if (this.scene.player) {
-      this.scene.player.takeDamage(10, bullet); // Standard damage value
-    }
+    this.scene.player?.takeDamage(10, bullet); // Standard damage value
   }
 
   /**
@@ -168,10 +166,10 @@ export default class ProjectileManager {
       return;
     }
 
-    // Advance typing progress on target hit
+    // Delegate typing hit handling entirely to the target enemy
     if (bullet.targetEnemy) {
-      if (typeof enemy.advanceProgress === "function") {
-        enemy.advanceProgress();
+      if (typeof enemy.handleTypingBulletHit === "function") {
+        enemy.handleTypingBulletHit(bullet.isFinalTypingShot);
       }
     } else {
       // Fallback for any non-typed damage (if any exist)

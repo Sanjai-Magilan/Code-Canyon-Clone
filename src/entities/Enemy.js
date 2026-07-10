@@ -14,7 +14,7 @@ export default class Enemy {
    * @param {number} speed Movement speed multiplier
    * @param {number} scale Image scaling multiplier
    */
-  constructor(
+  constructor({
     scene,
     x,
     y,
@@ -24,7 +24,7 @@ export default class Enemy {
     speed = ENEMY_CONFIG.speed,
     scale = ENEMY_CONFIG.scale,
     shadowConfig = ENEMY_CONFIG.shadow
-  ) {
+  }) {
     this.scene = scene;
     this.speed = speed;
     this.scale = scale;
@@ -253,6 +253,20 @@ export default class Enemy {
         sprite.y = this.sprite.y - 85;
         sprite.setDepth(this.sprite.depth + 100);
       }
+    }
+  }
+
+  /**
+   * Handles typing-combat bullet hit decision making.
+   * @param {boolean} isFinalTypingShot Whether this bullet completes the word
+   */
+  handleTypingBulletHit(isFinalTypingShot) {
+    if (this.isDead) return;
+
+    if (isFinalTypingShot) {
+      this.die();
+    } else {
+      this.advanceProgress();
     }
   }
 

@@ -89,10 +89,10 @@ export default class WaveManager {
     const elapsedSeconds = this.getElapsedTime() / 1000;
     
     let cumulativeTime = 0;
-    for (let i = 0; i < this.waves.length; i++) {
-      cumulativeTime += this.waves[i].duration;
+    for (const waveConfig of this.waves) {
+      cumulativeTime += waveConfig.duration;
       if (elapsedSeconds < cumulativeTime) {
-        return this.waves[i];
+        return waveConfig;
       }
     }
     // Return last wave if all durations exceeded
@@ -108,10 +108,10 @@ export default class WaveManager {
     const rand = Math.random();
     let cumulativeWeight = 0;
 
-    for (let i = 0; i < config.enemies.length; i++) {
-      cumulativeWeight += config.enemies[i].weight;
+    for (const enemyConfig of config.enemies) {
+      cumulativeWeight += enemyConfig.weight;
       if (rand <= cumulativeWeight) {
-        const type = config.enemies[i].type;
+        const type = enemyConfig.type;
         return this.enemyRegistry[type] || this.enemyRegistry.worm;
       }
     }

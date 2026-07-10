@@ -437,17 +437,8 @@ export default class GameScene extends Phaser.Scene {
     this.lightningIcon.setTint(0x777777);
     this.lightningIcon.setAlpha(0.35);
 
-    // Mouse click activation
-    this.lightningIcon.setInteractive({ useHandCursor: true });
-    this.lightningIcon.on("pointerdown", (pointer, localX, localY, event) => {
-      if (event) {
-        event.stopPropagation();
-      }
-      this.triggerLightningAttack();
-    });
-
-    // Keyboard activation (Q key)
-    this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+    // Keyboard activation (Numeric 1 key)
+    this.keyOne = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
 
     // pointerdown click shooting removed for typing combat
 
@@ -482,147 +473,189 @@ export default class GameScene extends Phaser.Scene {
     }
     if (!this.player || this.player.isDead) return;
     try {
-      this.player.update(this.cursors);
-
-
-      // Dynamically adjust spawn delay based on current wave configuration
-      if (this.spawnTimerEvent) {
-        this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
-      }
-
-      // Check if a wave has completed (transitioned to a new wave ID)
-      const activeWaveConfig = this.waveManager.getCurrentWaveConfig();
-      if (activeWaveConfig && activeWaveConfig.id !== this.currentWaveId) {
-        this.sound.play("wave-completed", { volume: 0.5 });
-        this.currentWaveId = activeWaveConfig.id;
-        this.showWavePopup(activeWaveConfig.id);
-      }
-
-      const playerSprite = this.player.getSprite();
-
-      // Camera Look-Ahead System based on player body velocity
-      if (playerSprite && playerSprite.body) {
-        const playerVelX = playerSprite.body.velocity.x;
-        const playerVelY = playerSprite.body.velocity.y;
-        const playerSpeed = this.player.speed || 240;
-
-        // Calculate target offset (inverted because followOffset shifts view opposite to focus)
-        const targetOffsetX = -(playerVelX / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
-        const targetOffsetY = -(playerVelY / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
-
-        // Smoothly interpolate the camera's followOffset towards the target offset
-        this.cameras.main.followOffset.x = Phaser.Math.Linear(
-          this.cameras.main.followOffset.x,
-          targetOffsetX,
-          CAMERA_CONFIG.lookAheadSmoothness
-        );
-        this.cameras.main.followOffset.y = Phaser.Math.Linear(
-          this.cameras.main.followOffset.y,
-          targetOffsetY,
-          CAMERA_CONFIG.lookAheadSmoothness
-        );
-      }
-
-      // Despawn off-screen enemies far behind the player
-      const view = this.cameras.main.worldView;
-      const despawnMargin = 400;
-
-      for (let i = this.enemies.length - 1; i >= 0; i--) {
-        const enemy = this.enemies[i];
-        if (enemy && enemy.sprite && enemy.sprite.active) {
-          if (
-            enemy.sprite.x < view.x - despawnMargin ||
-            enemy.sprite.x > view.right + despawnMargin ||
-            enemy.sprite.y < view.y - despawnMargin ||
-            enemy.sprite.y > view.bottom + despawnMargin
-          ) {
-            if (this.enemiesGroup) {
-              this.enemiesGroup.remove(enemy.sprite);
-            }
-            if (enemy.sprite) {
-              enemy.sprite.destroy();
-            }
-            this.enemies.splice(i, 1);
-          }
-        }
-      }
-
-      // Cache active/unfrozen enemies to avoid redundant checks inside O(N^2) loop
-      const activeEnemies = [];
-      for (let i = 0; i < this.enemies.length; i++) {
-        const enemy = this.enemies[i];
-        if (enemy && enemy.sprite && enemy.sprite.active && !enemy.isFrozen) {
-          activeEnemies.push(enemy);
-        }
-      }
-
-      // Update enemy AI behaviors (pathfinding/velocity update) and lightweight separation
-      for (const enemy of activeEnemies) {
-        enemy.update(playerSprite);
-
-        // Apply lightweight repulsion separation from other nearby active enemies
-        if (enemy.sprite.body) {
-          let repelX = 0;
-          let repelY = 0;
-          let count = 0;
-
-          for (const other of activeEnemies) {
-            if (other === enemy) continue;
-
-            const diffX = enemy.sprite.x - other.sprite.x;
-            const diffY = enemy.sprite.y - other.sprite.y;
-            const distSq = diffX * diffX + diffY * diffY;
-
-            if (distSq > 0 && distSq < 6400) { // 80 * 80 = 6400
-              const dist = Math.sqrt(distSq);
-              const weight = (80 - dist) / 80;
-              repelX += (diffX / dist) * weight;
-              repelY += (diffY / dist) * weight;
-              count++;
-            }
-          }
-
-          if (count > 0) {
-            const strength = 30; // 30 px/s separation force
-            enemy.sprite.body.velocity.x += (repelX / count) * strength;
-            enemy.sprite.body.velocity.y += (repelY / count) * strength;
-          }
-        }
-      }
-
-      // Always update positions of all enemy word labels
-      for (const enemy of this.enemies) {
-        if (enemy && typeof enemy.updateWordSpritesPosition === "function") {
-          enemy.updateWordSpritesPosition();
-        }
-      }
-
-      // Dynamic depth sorting (Y-Sorting) for correct overlapping visuals
-      playerSprite.setDepth(playerSprite.y);
-      this.player.head.setDepth(playerSprite.y + 0.1);
-      this.player.gun.setDepth(playerSprite.y + 0.2);
-      if (this.player.flash && this.player.flash.active) {
-        this.player.flash.setDepth(playerSprite.y + 0.3);
-      }
-
-      for (const enemy of this.enemies) {
-        enemy.sprite.setDepth(enemy.sprite.y);
-        enemy.shadow.setDepth(enemy.sprite.y - 1);
-      }
+      this.updatePlayerActions();
+      this.updateWaveConfig();
+      this.updateCameraLookAhead();
+      this.despawnOffScreenEnemies();
+      this.updateEnemyAIAndRepulsion();
+      this.updateEnemyLabels();
+      this.applyDepthSorting();
     } catch (err) {
-      console.error("CRITICAL RUNTIME ERROR IN UPDATE:", err);
-      if (!this.errorText) {
-        this.errorText = this.add.text(50, 50, "CRITICAL ERROR: " + err.message, {
-          fontSize: "24px",
-          color: "#ff0000",
-          backgroundColor: "#000000",
-          padding: { x: 10, y: 10 }
-        });
-        this.errorText.setScrollFactor(0);
-        this.errorText.setDepth(99999);
-      }
-      this.physics.pause();
+      this.handleUpdateError(err);
     }
+  }
+
+  updatePlayerActions() {
+    this.player.update(this.cursors);
+
+    // Check numeric 1 key down to activate lightning / thunder power
+    if (this.keyOne && Phaser.Input.Keyboard.JustDown(this.keyOne)) {
+      this.triggerLightningAttack();
+    }
+  }
+
+  updateWaveConfig() {
+    // Dynamically adjust spawn delay based on current wave configuration
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.delay = this.waveManager.getSpawnInterval();
+    }
+
+    // Check if a wave has completed (transitioned to a new wave ID)
+    const activeWaveConfig = this.waveManager.getCurrentWaveConfig();
+    if (activeWaveConfig && activeWaveConfig.id !== this.currentWaveId) {
+      this.sound.play("wave-completed", { volume: 0.5 });
+      this.currentWaveId = activeWaveConfig.id;
+      this.showWavePopup(activeWaveConfig.id);
+    }
+  }
+
+  updateCameraLookAhead() {
+    const playerSprite = this.player.getSprite();
+    // Camera Look-Ahead System based on player body velocity
+    if (playerSprite?.body) {
+      const playerVelX = playerSprite.body.velocity.x;
+      const playerVelY = playerSprite.body.velocity.y;
+      const playerSpeed = this.player.speed || 240;
+
+      // Calculate target offset (inverted because followOffset shifts view opposite to focus)
+      const targetOffsetX = -(playerVelX / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
+      const targetOffsetY = -(playerVelY / playerSpeed) * CAMERA_CONFIG.lookAheadDistance;
+
+      // Smoothly interpolate the camera's followOffset towards the target offset
+      this.cameras.main.followOffset.x = Phaser.Math.Linear(
+        this.cameras.main.followOffset.x,
+        targetOffsetX,
+        CAMERA_CONFIG.lookAheadSmoothness
+      );
+      this.cameras.main.followOffset.y = Phaser.Math.Linear(
+        this.cameras.main.followOffset.y,
+        targetOffsetY,
+        CAMERA_CONFIG.lookAheadSmoothness
+      );
+    }
+  }
+
+  despawnOffScreenEnemies() {
+    const view = this.cameras.main.worldView;
+    const despawnMargin = 400;
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      if (enemy?.sprite?.active) {
+        if (
+          enemy.sprite.x < view.x - despawnMargin ||
+          enemy.sprite.x > view.right + despawnMargin ||
+          enemy.sprite.y < view.y - despawnMargin ||
+          enemy.sprite.y > view.bottom + despawnMargin
+        ) {
+          if (this.enemiesGroup) {
+            this.enemiesGroup.remove(enemy.sprite);
+          }
+          if (enemy.sprite) {
+            enemy.sprite.destroy();
+          }
+          this.enemies.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  updateEnemyAIAndRepulsion() {
+    const playerSprite = this.player.getSprite();
+    const activeEnemies = this.getActiveEnemies();
+
+    for (const enemy of activeEnemies) {
+      this.updateEnemyAI(enemy, playerSprite);
+      this.applyEnemyRepulsion(enemy, activeEnemies);
+    }
+  }
+
+  getActiveEnemies() {
+    const activeEnemies = [];
+    for (const enemy of this.enemies) {
+      if (enemy?.sprite?.active && !enemy.isFrozen) {
+        activeEnemies.push(enemy);
+      }
+    }
+    return activeEnemies;
+  }
+
+  updateEnemyAI(enemy, playerSprite) {
+    enemy.update(playerSprite);
+  }
+
+  applyEnemyRepulsion(enemy, activeEnemies) {
+    if (!enemy.sprite?.body) {
+      return;
+    }
+
+    let repelX = 0;
+    let repelY = 0;
+    let count = 0;
+
+    for (const other of activeEnemies) {
+      if (other === enemy) continue;
+
+      const diffX = enemy.sprite.x - other.sprite.x;
+      const diffY = enemy.sprite.y - other.sprite.y;
+      const distSq = diffX * diffX + diffY * diffY;
+
+      if (distSq > 0 && distSq < 6400) { // 80 * 80 = 6400
+        const dist = Math.sqrt(distSq);
+        const weight = (80 - dist) / 80;
+        repelX += (diffX / dist) * weight;
+        repelY += (diffY / dist) * weight;
+        count++;
+      }
+    }
+
+    if (count > 0) {
+      this.applyRepulsionForce(enemy, repelX, repelY, count);
+    }
+  }
+
+  applyRepulsionForce(enemy, repelX, repelY, count) {
+    const strength = 30; // 30 px/s separation force
+    enemy.sprite.body.velocity.x += (repelX / count) * strength;
+    enemy.sprite.body.velocity.y += (repelY / count) * strength;
+  }
+
+  updateEnemyLabels() {
+    for (const enemy of this.enemies) {
+      if (enemy && typeof enemy.updateWordSpritesPosition === "function") {
+        enemy.updateWordSpritesPosition();
+      }
+    }
+  }
+
+  applyDepthSorting() {
+    const playerSprite = this.player.getSprite();
+    playerSprite.setDepth(playerSprite.y);
+    this.player.head.setDepth(playerSprite.y + 0.1);
+    this.player.gun.setDepth(playerSprite.y + 0.2);
+    if (this.player.flash?.active) {
+      this.player.flash.setDepth(playerSprite.y + 0.3);
+    }
+
+    for (const enemy of this.enemies) {
+      enemy.sprite.setDepth(enemy.sprite.y);
+      enemy.shadow.setDepth(enemy.sprite.y - 1);
+    }
+  }
+
+  handleUpdateError(err) {
+    console.error("CRITICAL RUNTIME ERROR IN UPDATE:", err);
+    if (!this.errorText) {
+      this.errorText = this.add.text(50, 50, "CRITICAL ERROR: " + err.message, {
+        fontSize: "24px",
+        color: "#ff0000",
+        backgroundColor: "#000000",
+        padding: { x: 10, y: 10 }
+      });
+      this.errorText.setScrollFactor(0);
+      this.errorText.setDepth(99999);
+    }
+    this.physics.pause();
   }
 
   spawnEnemyNearPlayer() {

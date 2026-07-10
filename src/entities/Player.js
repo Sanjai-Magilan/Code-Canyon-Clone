@@ -65,9 +65,7 @@ export default class Player {
     this.lastMoveDirection = new Phaser.Math.Vector2(1, 0);
     this.currentDirVector = new Phaser.Math.Vector2(0, 0);
 
-    if (this.scene && this.scene.input && this.scene.input.keyboard) {
-      this.spaceKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    }
+    this.spaceKey = this.scene?.input?.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) || null;
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -95,16 +93,6 @@ export default class Player {
 
     // Play default run animation (starts playing immediately)
     this.sprite.play(`${this.characterConfig.bodyTexture}-run`);
-
-    // --- Input Setup (WASD Keys) ---
-    if (this.scene.input && this.scene.input.keyboard) {
-      this.wasd = this.scene.input.keyboard.addKeys({
-        up: Phaser.Input.Keyboard.KeyCodes.W,
-        down: Phaser.Input.Keyboard.KeyCodes.S,
-        left: Phaser.Input.Keyboard.KeyCodes.A,
-        right: Phaser.Input.Keyboard.KeyCodes.D,
-      });
-    }
 
     // --- Solve the Physics Position Lag ---
     this.scene.events.on(
@@ -165,16 +153,11 @@ export default class Player {
 
     let isMoving = false;
 
-    // Read movements from both arrow keys (cursors) and WASD keys
-    const leftDown =
-      (cursors && cursors.left.isDown) || (this.wasd && this.wasd.left.isDown);
-    const rightDown =
-      (cursors && cursors.right.isDown) ||
-      (this.wasd && this.wasd.right.isDown);
-    const upDown =
-      (cursors && cursors.up.isDown) || (this.wasd && this.wasd.up.isDown);
-    const downDown =
-      (cursors && cursors.down.isDown) || (this.wasd && this.wasd.down.isDown);
+    // Read movements from arrow keys (cursors) ONLY (disable WASD to prevent typing conflict)
+    const leftDown = cursors && cursors.left.isDown;
+    const rightDown = cursors && cursors.right.isDown;
+    const upDown = cursors && cursors.up.isDown;
+    const downDown = cursors && cursors.down.isDown;
 
     // Calculate current movement direction vector using pre-allocated instance
     this.currentDirVector.set(0, 0);
@@ -294,6 +277,18 @@ export default class Player {
   }
 
   /**
+   * Safe helper to destroy a game object if active and not already shutting down.
+   */
+  destroyGameObject(obj, sceneShutdown) {
+    if (obj) {
+      if (!sceneShutdown && obj.active) {
+        obj.destroy();
+      }
+    }
+    return null;
+  }
+
+  /**
    * Cleanup method to destroy children and detach scene event listeners
    * to avoid memory leaks.
    */
@@ -303,7 +298,7 @@ export default class Player {
     console.log("Player destroyed");
 
     // Determine if this destroy is part of the scene's shutdown/restart pipeline
-    const sceneShutdown = !this.scene || !this.scene.scene || !this.scene.scene.isActive();
+    const sceneShutdown = !this.scene?.scene?.isActive();
 
     this.destroyShield(sceneShutdown);
     this.clearInvincibilityTimers();
@@ -313,50 +308,26 @@ export default class Player {
       this.tempWeaponTimer = null;
     }
 
-    if (this.scene && this.scene.events) {
-      this.scene.events.off(
-        Phaser.Scenes.Events.POST_UPDATE,
-        this.postUpdate,
-        this,
-      );
-      this.scene.events.off(
-        Phaser.Scenes.Events.SHUTDOWN,
-        this.destroy,
-        this,
-      );
-    }
+    this.scene?.events?.off(
+      Phaser.Scenes.Events.POST_UPDATE,
+      this.postUpdate,
+      this
+    );
+    this.scene?.events?.off(
+      Phaser.Scenes.Events.SHUTDOWN,
+      this.destroy,
+      this
+    );
 
     if (this.sprite) {
       this.sprite.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
-      if (!sceneShutdown && this.sprite.active) {
-        this.sprite.destroy();
-      }
+      this.destroyGameObject(this.sprite, sceneShutdown);
       this.sprite = null;
     }
-    if (this.head) {
-      if (!sceneShutdown && this.head.active) {
-        this.head.destroy();
-      }
-      this.head = null;
-    }
-    if (this.gun) {
-      if (!sceneShutdown && this.gun.active) {
-        this.gun.destroy();
-      }
-      this.gun = null;
-    }
-    if (this.flash) {
-      if (!sceneShutdown && this.flash.active) {
-        this.flash.destroy();
-      }
-      this.flash = null;
-    }
-    if (this.shadow) {
-      if (!sceneShutdown && this.shadow.active) {
-        this.shadow.destroy();
-      }
-      this.shadow = null;
-    }
+    this.head = this.destroyGameObject(this.head, sceneShutdown);
+    this.gun = this.destroyGameObject(this.gun, sceneShutdown);
+    this.flash = this.destroyGameObject(this.flash, sceneShutdown);
+    this.shadow = this.destroyGameObject(this.shadow, sceneShutdown);
 
     // Clean up dash timers
     if (this.dashTimer) {
@@ -416,42 +387,50 @@ export default class Player {
     });
   }
 
+  /**
+   * Check if shield can block the damage source, and handle blocks
+   */
+  checkShieldBlock(source) {
+    if (!this.hasShield || !source) return false;
+
+    const angleToSource = Phaser.Math.Angle.Between(
+      this.sprite.x,
+      this.sprite.y,
+      source.x,
+      source.y
+    );
+
+    let shieldAngle = 0;
+    switch (this.shieldDirection) {
+      case "right": shieldAngle = 0; break;
+      case "left": shieldAngle = Math.PI; break;
+      case "up": shieldAngle = -Math.PI / 2; break;
+      case "down": shieldAngle = Math.PI / 2; break;
+    }
+
+    const diff = Phaser.Math.Angle.Wrap(angleToSource - shieldAngle);
+
+    if (Math.abs(diff) <= Math.PI / 4) { // covers ±45 degrees
+      this.blockDamage();
+
+      // If the damage source is an enemy sprite, kill it immediately upon hitting the shield
+      if (this.scene?.enemies) {
+        const enemy = this.scene.enemies.find(e => e.sprite === source);
+        enemy?.die();
+      }
+
+      return true;
+    }
+    return false;
+  }
+
   takeDamage(amount, source = null) {
     if (this.isDead || this.isDashing) return;
 
     console.trace("takeDamage called");
 
-    if (this.hasShield && source) {
-      const angleToSource = Phaser.Math.Angle.Between(
-        this.sprite.x,
-        this.sprite.y,
-        source.x,
-        source.y
-      );
-
-      let shieldAngle = 0;
-      switch (this.shieldDirection) {
-        case "right": shieldAngle = 0; break;
-        case "left": shieldAngle = Math.PI; break;
-        case "up": shieldAngle = -Math.PI / 2; break;
-        case "down": shieldAngle = Math.PI / 2; break;
-      }
-
-      const diff = Phaser.Math.Angle.Wrap(angleToSource - shieldAngle);
-
-      if (Math.abs(diff) <= Math.PI / 4) { // covers ±45 degrees
-        this.blockDamage();
-
-        // If the damage source is an enemy sprite, kill it immediately upon hitting the shield
-        if (this.scene && this.scene.enemies) {
-          const enemy = this.scene.enemies.find(e => e.sprite === source);
-          if (enemy) {
-            enemy.die();
-          }
-        }
-
-        return;
-      }
+    if (this.checkShieldBlock(source)) {
+      return;
     }
 
     if (this.isInvincible) {
@@ -460,7 +439,7 @@ export default class Player {
     }
 
     // Play hit sound effect
-    this.scene.sound.play("player-oof", { volume: 0.3 });
+    this.scene?.sound?.play("player-oof", { volume: 0.3 });
 
     this.health = Math.max(0, this.health - 1);
     console.log("Health:", this.health);
@@ -468,12 +447,10 @@ export default class Player {
     console.log(
       "Player hit",
       this.health,
-      this.scene.time.now
+      this.scene?.time?.now
     );
 
-    if (this.scene && typeof this.scene.updateHearts === "function") {
-      this.scene.updateHearts();
-    }
+    this.scene?.updateHearts?.();
 
     if (this.health <= 0) {
       console.log("Calling die()");
@@ -491,9 +468,7 @@ export default class Player {
     if (this.isDead) return;
     this.health = Math.min(this.maxHealth, this.health + amount);
     console.trace("health changed");
-    if (this.scene && typeof this.scene.updateHearts === "function") {
-      this.scene.updateHearts();
-    }
+    this.scene?.updateHearts?.();
   }
 
   /**
@@ -519,25 +494,19 @@ export default class Player {
     if (this.shadow) this.shadow.setVisible(false);
 
     // Shake camera slightly
-    if (this.scene && this.scene.cameras && this.scene.cameras.main) {
-      this.scene.cameras.main.shake(300, 0.02);
-    }
+    this.scene?.cameras?.main?.shake(300, 0.02);
 
     // Restart the scene after 1000ms delay using Phaser's Clock
     console.log("Restart timer started");
-    if (this.scene && this.scene.time) {
-      this.scene.time.delayedCall(1000, () => {
-        console.log("Restart callback entered");
-        if (this.scene && this.scene.scene) {
-          try {
-            console.log("Scene restarting");
-            this.scene.scene.restart();
-          } catch (err) {
-            console.error("CRITICAL ERROR RESTARTING SCENE:", err);
-          }
-        }
-      });
-    }
+    this.scene?.time?.delayedCall(1000, () => {
+      console.log("Restart callback entered");
+      try {
+        console.log("Scene restarting");
+        this.scene?.scene?.restart();
+      } catch (err) {
+        console.error("CRITICAL ERROR RESTARTING SCENE:", err);
+      }
+    });
   }
 
   /**
@@ -573,9 +542,7 @@ export default class Player {
       this.shield = null;
     }
     // Clear shield power-up UI
-    if (this.scene && typeof this.scene.clearShieldPowerup === "function") {
-      this.scene.clearShieldPowerup();
-    }
+    this.scene?.clearShieldPowerup?.();
   }
 
   /**

@@ -20,7 +20,7 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    * @param {object|null} parentVelocity Owner velocity to inherit
    * @param {number} inheritanceFactor Proportion of owner velocity to inherit (0.0 to 1.0)
    */
-  fire(x, y, angle, speed = this.speed, scale = null, lifetime = null, parentVelocity = null, inheritanceFactor = 0, damage = 50) {
+  fire({ x, y, angle, speed = this.speed, scale = null, lifetime = null, parentVelocity = null, inheritanceFactor = 0, damage = 50 }) {
     this.damage = damage;
     // Re-enable the physics body and make the bullet active and visible
     this.enableBody(true, x, y, true, true);
@@ -50,6 +50,15 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
     // Track spawn timing and lifetime limits
     this.timeFired = this.scene.time.now;
     this.lifetime = lifetime;
+  }
+
+  /**
+   * Getter returning whether this is the final typing completion bullet.
+   * @returns {boolean}
+   */
+  get isFinalTypingShot() {
+    if (!this.targetEnemy || !this.targetEnemy.assignedWord) return false;
+    return this.targetLetterIndex !== null && this.targetLetterIndex >= this.targetEnemy.assignedWord.length;
   }
 
   /**
