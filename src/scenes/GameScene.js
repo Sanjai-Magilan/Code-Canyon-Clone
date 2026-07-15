@@ -546,13 +546,7 @@ export default class GameScene extends Phaser.Scene {
           enemy.sprite.y < view.y - despawnMargin ||
           enemy.sprite.y > view.bottom + despawnMargin
         ) {
-          if (this.enemiesGroup) {
-            this.enemiesGroup.remove(enemy.sprite);
-          }
-          if (enemy.sprite) {
-            enemy.sprite.destroy();
-          }
-          this.enemies.splice(i, 1);
+          enemy.destroy(false);
         }
       }
     }
@@ -1333,37 +1327,43 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Selects correct cached list based on wave number.
+   * Resolves the required word length for a given enemy type.
+   * Centralized configuration mapping to satisfy DRY/SRP.
    */
-  getWordListForWave(waveNumber) {
-    if (waveNumber === 1) return this.wordsCache[2] || [];
-    if (waveNumber === 2) return this.wordsCache[3] || [];
-    return this.wordsCache[4] || [];
+  getWordLengthForEnemyType(enemyType) {
+    const mapping = {
+      worm: 2,
+      crab: 3,
+      angler: 4
+    };
+    return mapping[enemyType] || 2;
   }
 
   /**
-   * Dequeues a unique word from the current wave queue.
+   * Dequeues a unique, type-specific word from the respective word-length queue.
+   * If a selected word is already active, it keeps searching from the same list
+   * unless all words in that list are active, in which case it reuses the word.
    */
-  getUniqueWordForEnemy() {
-    const wave = this.currentWaveId || 1;
-    let list = this.getWordListForWave(wave);
+  getUniqueWordForEnemy(enemyType) {
+    const wordLength = this.getWordLengthForEnemyType(enemyType);
+    let list = this.wordsCache[wordLength] || [];
     if (!list || list.length === 0) {
-      list = ["go", "run", "hit"]; // fallback
+      list = wordLength === 2 ? ["go", "am", "at"] : (wordLength === 3 ? ["ant", "ape", "arm"] : ["able", "acid", "acre"]); // fallback
     }
 
     if (!this.wordQueues) {
       this.wordQueues = {};
     }
 
-    if (!this.wordQueues[wave] || this.wordQueues[wave].length === 0) {
-      this.wordQueues[wave] = Phaser.Utils.Array.Shuffle([...list]);
+    if (!this.wordQueues[wordLength] || this.wordQueues[wordLength].length === 0) {
+      this.wordQueues[wordLength] = Phaser.Utils.Array.Shuffle([...list]);
     }
 
-    let word = this.wordQueues[wave].shift();
+    let word = this.wordQueues[wordLength].shift();
     let attempts = 0;
     while (this.activeWords.has(word) && attempts < 50) {
-      this.wordQueues[wave].push(word);
-      word = this.wordQueues[wave].shift();
+      this.wordQueues[wordLength].push(word);
+      word = this.wordQueues[wordLength].shift();
       attempts++;
     }
 
@@ -1380,13 +1380,17 @@ export default class GameScene extends Phaser.Scene {
     const char = event.key.toLowerCase();
     if (char.length !== 1 || char < "a" || char > "z") return;
 
+    console.log(`[Typing Pipeline] Key Pressed: "${char}"`);
+
     if (this.typingTarget) {
       if (!this.typingTarget.sprite || !this.typingTarget.sprite.active || this.typingTarget.isDead) {
+        console.log(`[Typing Pipeline] Existing target ${this.typingTarget.id} is dead/inactive. Resetting lock.`);
         this.typingTarget = null;
       }
     }
 
     if (!this.typingTarget) {
+      console.log(`[Typing Pipeline] Selecting new target for character "${char}"`);
       // Find visible active enemies whose next required letter matches char
       const view = this.cameras.main.worldView;
       const candidates = this.enemies.filter(enemy => {
@@ -1399,7 +1403,10 @@ export default class GameScene extends Phaser.Scene {
         return nextChar === char;
       });
 
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) {
+        console.log(`[Typing Pipeline] No candidates found for character "${char}"`);
+        return;
+      }
 
       // Lock onto the closest candidate to the player
       let closestEnemy = candidates[0];
@@ -1424,11 +1431,15 @@ export default class GameScene extends Phaser.Scene {
       }
 
       this.typingTarget = closestEnemy;
+      console.log(`[Typing Pipeline] Locked target to ${this.typingTarget.id} (${this.typingTarget.assignedWord})`);
     }
 
     const nextChar = this.typingTarget.assignedWord[this.typingTarget.currentLetterIndex].toLowerCase();
     if (char === nextChar) {
+      console.log(`[Typing Pipeline] Character matches! Advancing progress on target ${this.typingTarget.id}`);
       this.typingTarget.advanceProgress();
+    } else {
+      console.log(`[Typing Pipeline] Character "${char}" does not match next character "${nextChar}" for target ${this.typingTarget.id}`);
     }
   }
 
@@ -1437,6 +1448,8 @@ export default class GameScene extends Phaser.Scene {
    */
   fireCompletionBullet(target) {
     if (!target || !this.player) return;
+
+    console.log(`[Typing Pipeline] Completion detected for target ${target.id} (${target.assignedWord}). Firing completion bullet.`);
 
     const playerSprite = this.player.getSprite();
     const angle = Phaser.Math.Angle.Between(
@@ -1454,6 +1467,15 @@ export default class GameScene extends Phaser.Scene {
    */
   shutdown() {
     console.log("Scene shutdown");
+
+    // Clean up active enemies list safely
+    if (this.enemies) {
+      const enemiesCopy = [...this.enemies];
+      enemiesCopy.forEach(enemy => {
+        enemy.destroy(false);
+      });
+      this.enemies = [];
+    }
 
     // Clean up active power-up states, lightning, and timers
     this.clearWeaponPowerup();

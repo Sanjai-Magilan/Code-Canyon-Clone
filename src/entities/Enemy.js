@@ -25,6 +25,7 @@ export default class Enemy {
     scale = ENEMY_CONFIG.scale,
     shadowConfig = ENEMY_CONFIG.shadow
   }) {
+    this.id = 'enemy_' + (scene.enemyIdCounter = (scene.enemyIdCounter || 0) + 1);
     this.scene = scene;
     this.speed = speed;
     this.scale = scale;
@@ -48,18 +49,13 @@ export default class Enemy {
       this.sprite.play(animKey);
     }
 
-    // Set health based on enemy type (worm: 50, crab: 100, angler: 150)
-    this.maxHealth = 50;
-    if (texture === "crab") {
-      this.maxHealth = 100;
-    } else if (texture === "angler") {
-      this.maxHealth = 150;
-    }
+    // Set health to 1 so all enemies die in one bullet hit
+    this.maxHealth = 1;
     this.health = this.maxHealth;
     this.isDead = false;
 
     // --- Typing Combat System State ---
-    this.assignedWord = scene.getUniqueWordForEnemy();
+    this.assignedWord = scene.getUniqueWordForEnemy(texture);
     this.currentLetterIndex = 0;
     this.virtualLetterIndex = 0;
     this.typedProgress = "";
@@ -140,35 +136,18 @@ export default class Enemy {
    * Handles enemy death, including lists splicing, explosions, and pickups.
    */
   die() {
+    console.log(`[Typing Pipeline] die() called for ${this.id}`);
     if (this.isDead) return;
     this.isDead = true;
 
     const scene = this.scene;
-
-    // Clear typing target lock
-    if (scene?.typingTarget === this) {
-      scene.typingTarget = null;
-    }
-
-    // Immediately destroy all hovering letter sprites
-    if (this.wordSprites) {
-      this.wordSprites.forEach(sprite => {
-        if (sprite) sprite.destroy();
-      });
-      this.wordSprites = [];
-    }
 
     // Call scene onEnemyKilled hook to register kill streak progress
     if (scene && typeof scene.onEnemyKilled === "function") {
       scene.onEnemyKilled();
     }
 
-    const index = scene.enemies.findIndex((e) => e === this);
-    if (index !== -1) {
-      scene.enemies.splice(index, 1);
-    }
-
-    if (this.sprite?.active) {
+    if (this.sprite) {
       const deathX = this.sprite.x;
       const deathY = this.sprite.y;
 
@@ -207,9 +186,10 @@ export default class Enemy {
           }
         }
       }
-
-      this.sprite.destroy();
     }
+
+    // Clean up the enemy wrapper and its attached objects completely
+    this.destroy(false);
   }
 
   /**
@@ -246,10 +226,13 @@ export default class Enemy {
     const totalWidth = (word.length - 1) * letterSpacing;
     const startX = -totalWidth / 2;
 
+    const isMovingRight = this.sprite.flipX;
+    const xOffset = isMovingRight ? 10 : 0;
+
     for (let i = 0; i < this.wordSprites.length; i++) {
       const sprite = this.wordSprites[i];
       if (sprite?.active) {
-        sprite.x = this.sprite.x + startX + i * letterSpacing;
+        sprite.x = this.sprite.x + startX + i * letterSpacing + xOffset;
         sprite.y = this.sprite.y - 85;
         sprite.setDepth(this.sprite.depth + 100);
       }
@@ -261,11 +244,14 @@ export default class Enemy {
    * @param {boolean} isFinalTypingShot Whether this bullet completes the word
    */
   handleTypingBulletHit(isFinalTypingShot) {
+    console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id}: isFinalTypingShot=${isFinalTypingShot} isDead=${this.isDead}`);
     if (this.isDead) return;
 
     if (isFinalTypingShot) {
+      console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id} calling die()`);
       this.die();
     } else {
+      console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id} calling advanceProgress()`);
       this.advanceProgress();
     }
   }
@@ -279,6 +265,8 @@ export default class Enemy {
     this.currentLetterIndex++;
     this.typedProgress = this.assignedWord.slice(0, this.currentLetterIndex);
     this.remainingLetters = this.assignedWord.slice(this.currentLetterIndex);
+
+    console.log(`[Typing Pipeline] advanceProgress on ${this.id}: typed="${this.typedProgress}" remaining="${this.remainingLetters}" (length=${this.assignedWord.length})`);
 
     // Apply green tint to successfully typed/hit characters, clear tint for untyped
     for (let i = 0; i < this.wordSprites.length; i++) {
@@ -294,6 +282,7 @@ export default class Enemy {
 
     // Trigger completion bullet once the whole word is successfully typed
     if (this.currentLetterIndex >= this.assignedWord.length) {
+      console.log(`[Typing Pipeline] Word fully typed for ${this.id}. Triggering fireCompletionBullet.`);
       if (this.scene && typeof this.scene.fireCompletionBullet === "function") {
         this.scene.fireCompletionBullet(this);
       }
@@ -309,23 +298,45 @@ export default class Enemy {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
+    const scene = this.scene;
+    const sceneShutdown = !scene || !scene.scene || !scene.scene.isActive();
+
+    // Clear typing target lock
+    if (scene && scene.typingTarget === this) {
+      scene.typingTarget = null;
+    }
+
+    // Remove from the scene's active enemies list
+    if (scene && scene.enemies) {
+      const index = scene.enemies.findIndex((e) => e === this);
+      if (index !== -1) {
+        scene.enemies.splice(index, 1);
+      }
+    }
+
     if (this.shadow) {
-      this.shadow.destroy();
+      if (!sceneShutdown) {
+        this.shadow.destroy();
+      }
       this.shadow = null;
     }
     if (this.wordSprites) {
       this.wordSprites.forEach(sprite => {
-        if (sprite) sprite.destroy();
+        if (sprite && !sceneShutdown) sprite.destroy();
       });
       this.wordSprites = [];
     }
     if (this.assignedWord) {
-      this.scene?.activeWords?.delete(this.assignedWord);
+      scene?.activeWords?.delete(this.assignedWord);
     }
     if (this.sprite) {
+      this.sprite.off(Phaser.GameObjects.Events.DESTROY);
+      if (scene && scene.enemiesGroup) {
+        scene.enemiesGroup.remove(this.sprite);
+      }
       const sprite = this.sprite;
       this.sprite = null;
-      if (!fromSpriteEvent) {
+      if (!fromSpriteEvent && !sceneShutdown) {
         sprite.destroy();
       }
     }

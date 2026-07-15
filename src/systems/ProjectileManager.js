@@ -158,18 +158,51 @@ export default class ProjectileManager {
       return;
     }
 
+    // Extract target locked details before recycling the bullet
+    const targetEnemy = bullet.targetEnemy;
+    const isFinalTypingShot = bullet.isFinalTypingShot;
     const damage = bullet.damage !== undefined ? bullet.damage : 50;
-    bullet.deactivate(); // Recycle bullet to the pool
+    const isExplosive = bullet.texture?.key === "bullet_gun5";
 
-    if (bullet.texture?.key === "bullet_gun5") {
-      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage, bullet.targetEnemy);
-      return;
+    // Deactivate/recycle bullet to the pool
+    bullet.deactivate();
+
+    // Log the complete bullet and target state trace
+    if (targetEnemy) {
+      const existsInEnemies = scene.enemies.includes(targetEnemy);
+      const existsInGroup = scene.enemiesGroup && scene.enemiesGroup.contains(targetEnemy.sprite);
+      console.log(`[Typing Pipeline Log] Collision Fired:`, {
+        enemyId: targetEnemy.id,
+        enemyType: targetEnemy.sprite?.texture?.key || "unknown",
+        assignedWord: targetEnemy.assignedWord,
+        currentLetterIndex: targetEnemy.currentLetterIndex,
+        targetLetterIndex: bullet.targetLetterIndex,
+        isFinalTypingShot: isFinalTypingShot,
+        health: targetEnemy.health,
+        isDead: targetEnemy.isDead,
+        spriteActive: targetEnemy.sprite?.active || false,
+        wrapperExists: !!targetEnemy,
+        existsInEnemies,
+        existsInGroup,
+        collisionFired: true,
+        dieCalled: false
+      });
+    }
+
+    // Handle explosive bullet logic
+    if (isExplosive) {
+      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage, targetEnemy);
+      // Only return early if this is a normal untargeted explosive bullet.
+      // If it is a targeted completion bullet, let it continue through to the typing system so the enemy is killed!
+      if (!targetEnemy) {
+        return;
+      }
     }
 
     // Delegate typing hit handling entirely to the target enemy
-    if (bullet.targetEnemy) {
+    if (targetEnemy) {
       if (typeof enemy.handleTypingBulletHit === "function") {
-        enemy.handleTypingBulletHit(bullet.isFinalTypingShot);
+        enemy.handleTypingBulletHit(isFinalTypingShot);
       }
     } else {
       // Fallback for any non-typed damage (if any exist)

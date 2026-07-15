@@ -94,7 +94,7 @@ export default class HoppingEnemy extends Enemy {
         }
       },
       onUpdate: () => {
-        if (!this.sprite || !this.sprite.active) return;
+        if (!this.sprite || !this.sprite.active || !this.shadow || !this.shadow.active) return;
 
         const t = this.jumpProgress;
 
@@ -145,8 +145,8 @@ export default class HoppingEnemy extends Enemy {
   /**
    * Clean up tweens to prevent memory leaks and exceptions upon destruction.
    */
-  destroy() {
+  destroy(fromSpriteEvent = false) {
     this.scene?.tweens?.killTweensOf(this);
-    super.destroy();
+    super.destroy(fromSpriteEvent);
   }
 }
