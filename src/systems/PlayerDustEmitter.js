@@ -92,20 +92,22 @@ export default class PlayerDustEmitter {
     const sprite = this.player.sprite;
     if (!sprite) return;
 
-    // Target the bottom of the body (feet level)
-    let spawnX = sprite.x + 20;
+    // Symmetrical calculation: mirror the offsets based on facing direction (flipX)
+    // multiplier is -1 if facing left (sprite.flipX is true), and 1 if facing right (sprite.flipX is false)
+    const multiplier = sprite.flipX ? -1 : 1;
+    
+    // Foot position is offset by -10px (headOffset's X is -10, matching the body skeleton alignment)
+    const baseFootOffset = -10 * (sprite.scaleX || 0.8);
+    // Behind offset shifts it opposite the facing direction (to the left/negative when facing right)
+    const baseBehindOffset = -8; 
+
+    // Combine base foot offset and behind offset, then mirror it
+    let spawnX = sprite.x + (baseFootOffset + baseBehindOffset) * multiplier;
     let spawnY = sprite.y + 42;
 
-    // Apply random offsets around the feet (±5-10px)
-    spawnX += Phaser.Math.Between(-8, 8);
+    // Apply random offsets around the feet (±6 px horizontally, ±3 px vertically) for natural variation
+    spawnX += Phaser.Math.Between(-6, 6);
     spawnY += Phaser.Math.Between(-3, 3);
-
-    // Shift spawning position slightly behind the feet based on movement direction
-    if (playerVx < -10) {
-      spawnX += Phaser.Math.Between(5, 12);
-    } else if (playerVx > 10) {
-      spawnX -= Phaser.Math.Between(5, 12);
-    }
 
     // Calculate drift velocities opposite the player's movement direction
     const driftFactor = 0.04;
