@@ -3,6 +3,7 @@ import Weapon from "./Weapon";
 import CHARACTERS from "../config/characterConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 import PLAYER_CONFIG from "../config/playerConfig";
+import PlayerDustEmitter from "../systems/PlayerDustEmitter";
 
 export default class Player {
   /**
@@ -66,6 +67,9 @@ export default class Player {
     this.currentDirVector = new Phaser.Math.Vector2(0, 0);
 
     this.spaceKey = this.scene?.input?.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) || null;
+
+    // Initialize running dust emitter system
+    this.dustEmitter = new PlayerDustEmitter(this.scene, this);
 
     // --- Sprite & Physics Creation ---
     this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
@@ -215,8 +219,13 @@ export default class Player {
    * Sync positions of attachments post-update to eliminate 1-frame position lag.
    * This executes after physics updates body position but before rendering.
    */
-  postUpdate() {
+  postUpdate(time, delta) {
     if (!this.sprite || !this.sprite.active) return;
+
+    // Update player running dust particles
+    if (this.dustEmitter) {
+      this.dustEmitter.update(time, delta);
+    }
 
     // Snappy math-based exponential visual recoil decay (zero dynamic allocations)
     this.recoilOffset *= this.characterConfig.recoil.offsetDecay;
@@ -328,6 +337,11 @@ export default class Player {
     this.gun = this.destroyGameObject(this.gun, sceneShutdown);
     this.flash = this.destroyGameObject(this.flash, sceneShutdown);
     this.shadow = this.destroyGameObject(this.shadow, sceneShutdown);
+
+    if (this.dustEmitter) {
+      this.dustEmitter.destroy();
+      this.dustEmitter = null;
+    }
 
     // Clean up dash timers
     if (this.dashTimer) {

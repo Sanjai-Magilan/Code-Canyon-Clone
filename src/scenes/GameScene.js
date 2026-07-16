@@ -34,6 +34,7 @@ import WeaponDropManager from "../systems/WeaponDropManager";
 import word2Text from "../assets/text/2-letter.txt";
 import word3Text from "../assets/text/3-letter.txt";
 import word4Text from "../assets/text/4-letter.txt";
+import playerDustImg from "../assets/Sprites/dust/images/mistrail-animation 1-000.png";
 
 import gunDrop1 from "../assets/Sprites/Guns/guns drop/gun-001.png";
 import gunDrop2 from "../assets/Sprites/Guns/guns drop/gun-002.png";
@@ -164,6 +165,9 @@ export default class GameScene extends Phaser.Scene {
     this.load.text("word-2", word2Text);
     this.load.text("word-3", word3Text);
     this.load.text("word-4", word4Text);
+
+    // Preload running dust particles
+    this.load.image("player-dust", playerDustImg);
   }
 
   create() {
