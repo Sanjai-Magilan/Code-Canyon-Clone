@@ -4,6 +4,7 @@ import CHARACTERS from "../config/characterConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 import PLAYER_CONFIG from "../config/playerConfig";
 import PlayerDustEmitter from "../systems/PlayerDustEmitter";
+import HEAD_OFFSETS from "../config/headOffsets";
 
 export default class Player {
   /**
@@ -245,14 +246,16 @@ export default class Player {
     this.shadow.setPosition(this.sprite.x + shadowOffsetX, this.sprite.y + 30);
     this.shadow.setFlipX(this.sprite.flipX);
 
-    // Sync positions
+    // Lookup head offset dynamically based on current head texture
+    const offset = HEAD_OFFSETS[this.head.texture.key] || this.headOffset;
+
     const headBob =
       Math.sin(this.scene.time.now * this.headFloatSpeed) *
       this.headFloatAmplitude;
 
     this.head.setPosition(
-      this.sprite.x + this.headOffset.x * flipMultiplier,
-      this.sprite.y + this.headOffset.y + headBob,
+      this.sprite.x + offset.x * flipMultiplier,
+      this.sprite.y + offset.y + headBob,
     );
     this.gun.setPosition(
       this.sprite.x + (this.gunOffset.x + this.recoilOffset) * flipMultiplier,
