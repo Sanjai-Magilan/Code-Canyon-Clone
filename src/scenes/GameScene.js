@@ -451,29 +451,10 @@ export default class GameScene extends Phaser.Scene {
 
     // pointerdown click shooting removed for typing combat
 
-    // Start Screen / Play Button initialization
+    // Start gameplay immediately (no landing overlay play button)
     this.gameStarted = false;
-    const camera = this.cameras.main;
-    const button = this.add.image(camera.centerX, camera.centerY, "play-button");
-    button.setScale(0.5); 
-    button.setScrollFactor(0);
-    button.setDepth(200000);
-    button.setInteractive({ useHandCursor: true });
-
-    button.on("pointerover", () => {
-      button.setScale(0.55);
-    });
-    button.on("pointerout", () => {
-      button.setScale(0.5);
-    });
-    button.on("pointerdown", () => {
-      button.setScale(0.55);
-    });
-    button.on("pointerup", () => {
-      this.startGame();
-    });
-
-    this.playButton = button;
+    this.playButton = null;
+    this.startGame();
   }
 
   update() {

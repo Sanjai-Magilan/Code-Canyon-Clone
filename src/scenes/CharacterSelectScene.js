@@ -173,7 +173,7 @@ export default class CharacterSelectScene extends Phaser.Scene {
       rightBtn.setScale(0.95);
     });
 
-    // 5. Character info label
+    // 5. Character info label (placed slightly higher to leave room for the restored PLAY button)
     this.characterNameText = this.add.text(960, 740, initialHero.name.toUpperCase(), {
       fontSize: "44px",
       fontFamily: "monospace",
@@ -181,7 +181,7 @@ export default class CharacterSelectScene extends Phaser.Scene {
       fontStyle: "bold"
     }).setOrigin(0.5).setShadow(2, 2, "#000000", 3);
 
-    // 6. Large PLAY button
+    // 6. Large PLAY button (Restored)
     const playBtn = this.add.image(960, 890, "play-button")
       .setInteractive({ useHandCursor: true })
       .setScale(0.75);
@@ -209,8 +209,31 @@ export default class CharacterSelectScene extends Phaser.Scene {
       playBtn.setScale(0.82);
       this.startGame();
     });
+
+    // 7. Keyboard events
+    this.input.keyboard.on("keydown", (event) => {
+      if (this.isTransitioning) return;
+      switch (event.code) {
+        case "ArrowLeft":
+          this.changeCharacter(-1);
+          break;
+        case "ArrowRight":
+          this.changeCharacter(1);
+          break;
+        case "Enter":
+        case "Space":
+          // Prevent browser scrolling behavior on space press
+          event.preventDefault();
+          this.startGame();
+          break;
+      }
+    });
   }
 
+  /**
+   * Navigates to next/previous character with scale-pop, fade, and slide transitions.
+   * @param {number} direction Navigation direction (-1 for left, 1 for right)
+   */
   changeCharacter(direction) {
     console.log(`[CharacterSelectScene] Arrow click event detected, direction: ${direction}`);
     console.log(`[CharacterSelectScene] Before changeCharacter: selectedIndex=${this.selectedIndex}`);
@@ -284,12 +307,28 @@ export default class CharacterSelectScene extends Phaser.Scene {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
 
-    // Flash/Fade out camera effect
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      const selected = this.characters[this.selectedIndex];
-      this.isTransitioning = false;
-      this.scene.start("GameScene", { selectedHeadKey: selected.headKey });
+    // Play selection sound
+    if (this.cache.audio.exists("power-up")) {
+      this.sound.play("power-up", { volume: 0.5 });
+    }
+
+    // Scale pop animation on active portrait
+    this.tweens.add({
+      targets: this.currentPortrait,
+      scale: 1.25,
+      alpha: 0.8,
+      duration: 150,
+      yoyo: true,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        // Snappy camera fade out (300ms)
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+          const selected = this.characters[this.selectedIndex];
+          this.isTransitioning = false;
+          this.scene.start("GameScene", { selectedHeadKey: selected.headKey });
+        });
+      }
     });
   }
 }
