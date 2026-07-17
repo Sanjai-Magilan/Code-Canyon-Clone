@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import CharacterSelectScene from "./scenes/CharacterSelectScene";
 import GameScene from "./scenes/GameScene";
 import "./style.css";
 const config = {
@@ -19,7 +20,7 @@ const config = {
     },
   },
 
-  scene: [GameScene],
+  scene: [CharacterSelectScene, GameScene],
 };
 
 new Phaser.Game(config);

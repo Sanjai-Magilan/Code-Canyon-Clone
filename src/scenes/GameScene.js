@@ -170,6 +170,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("player-dust", playerDustImg);
   }
 
+  init(data) {
+    this.selectedHeadKey = data?.selectedHeadKey || "player-head";
+  }
+
   create() {
     console.log("Scene create");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -201,6 +205,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Initialize player with a specific character configuration key (e.g. "soldier")
     this.player = new Player(this, worldWidth / 2, worldHeight / 2, "soldier");
+    if (this.selectedHeadKey) {
+      this.player.head.setTexture(this.selectedHeadKey);
+    }
     this.playerHP = this.player.maxHealth;
 
     // Setup camera follow with lerping/smoothing and deadzone configurations
