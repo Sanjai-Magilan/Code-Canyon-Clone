@@ -16,6 +16,7 @@ import CAMERA_CONFIG from "../config/cameraConfig";
 import WORLD_CONFIG from "../config/worldConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
 import { DAMAGE_SOURCE } from "../config/damageSources";
+import HUD_FONT_OFFSETS from "../config/hudFontOffsets";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import explosionSheet from "../assets/Sprites/Enemy/explosion/explosion-sheet.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
@@ -153,7 +154,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
-      frameHeight: 154
+      frameHeight: 155.5
     });
     this.load.image("lightning-icon", lightningIconImg);
     this.load.spritesheet("lightning-beam", beamImg, {
@@ -427,7 +428,7 @@ export default class GameScene extends Phaser.Scene {
     this.shieldPowerupIcon.setVisible(false);
 
     // Centered Heart count digit sprite inside the health bar slot
-    this.heartCountSprite = this.add.sprite(196, 90, "hud-font");
+    this.heartCountSprite = this.add.sprite(196, 90 + HUD_FONT_OFFSETS.healthDigitY, "hud-font");
     this.heartCountSprite.setFrame(57); // '5'
     this.heartCountSprite.setScale(0.3);
     this.heartCountSprite.setScrollFactor(0);
@@ -849,7 +850,7 @@ export default class GameScene extends Phaser.Scene {
     ];
 
     chars.forEach(char => {
-      const sprite = this.add.sprite(centerX + char.offsetX, centerY, "hud-font");
+      const sprite = this.add.sprite(centerX + char.offsetX, centerY + HUD_FONT_OFFSETS.wavePopupY, "hud-font");
       sprite.setFrame(char.frame);
       sprite.setScale(0.1);
       sprite.setScrollFactor(0);

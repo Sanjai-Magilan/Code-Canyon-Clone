@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import ENEMY_CONFIG from "../config/enemyConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 import { DAMAGE_SOURCE } from "../config/damageSources";
+import HUD_FONT_OFFSETS from "../config/hudFontOffsets";
 
 export default class Enemy {
   /**
@@ -214,7 +215,7 @@ export default class Enemy {
       const charCode = word.charCodeAt(i) - 65; // A = 65
       const frame = (charCode >= 0 && charCode <= 25) ? charCode : 0;
 
-      const sprite = scene.add.sprite(this.sprite.x + startX + i * letterSpacing, this.sprite.y - 85, "hud-font");
+      const sprite = scene.add.sprite(this.sprite.x + startX + i * letterSpacing, this.sprite.y - 85 + HUD_FONT_OFFSETS.enemyWordY, "hud-font");
       sprite.setFrame(frame);
       sprite.setScale(0.24);
       sprite.setDepth(this.sprite.depth + 100);
@@ -241,7 +242,7 @@ export default class Enemy {
       const sprite = this.wordSprites[i];
       if (sprite?.active) {
         sprite.x = this.sprite.x + startX + i * letterSpacing + xOffset;
-        sprite.y = this.sprite.y - 85;
+        sprite.y = this.sprite.y - 85 + HUD_FONT_OFFSETS.enemyWordY;
         sprite.setDepth(this.sprite.depth + 100);
       }
     }
