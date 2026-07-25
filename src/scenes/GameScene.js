@@ -153,7 +153,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("slot-frame", slotFrameImg);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
-      frameWidth: 165,
+      frameWidth: 158,
       frameHeight: 155.5
     });
     this.load.image("lightning-icon", lightningIconImg);
