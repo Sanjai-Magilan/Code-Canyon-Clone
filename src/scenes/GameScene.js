@@ -842,10 +842,10 @@ export default class GameScene extends Phaser.Scene {
 
     const popupSprites = [];
     const chars = [
-      { frame: 22, offsetX: -160 }, // W (width 165)
-      { frame: 0,  offsetX: -70  }, // A (width 112)
+      { frame: 22, offsetX: -150 }, // W (width 165)
+      { frame: 0,  offsetX: -65  }, // A (width 112)
       { frame: 21, offsetX: -5   }, // V (width 105)
-      { frame: 4,  offsetX: 50   }, // E (width 83)
+      { frame: 4,  offsetX: 60   }, // E (width 83)
       { frame: 52 + waveNumber, offsetX: 115 } // Digit character
     ];
 
