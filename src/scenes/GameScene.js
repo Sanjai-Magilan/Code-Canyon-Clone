@@ -153,7 +153,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("slot-frame", slotFrameImg);
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
-      frameWidth: 158,
+      frameWidth: 165,
       frameHeight: 155.5
     });
     this.load.image("lightning-icon", lightningIconImg);
@@ -842,16 +842,17 @@ export default class GameScene extends Phaser.Scene {
 
     const popupSprites = [];
     const chars = [
-      { frame: 22, offsetX: -120 }, // W
-      { frame: 0,  offsetX: -65  }, // A
-      { frame: 21, offsetX: -15  }, // V
-      { frame: 4,  offsetX: 35   }, // E
-      { frame: 52 + waveNumber, offsetX: 110 } // Digit character
+      { frame: 22, offsetX: -160 }, // W (width 165)
+      { frame: 0,  offsetX: -70  }, // A (width 112)
+      { frame: 21, offsetX: -5   }, // V (width 105)
+      { frame: 4,  offsetX: 50   }, // E (width 83)
+      { frame: 52 + waveNumber, offsetX: 115 } // Digit character
     ];
 
     chars.forEach(char => {
       const sprite = this.add.sprite(centerX + char.offsetX, centerY + HUD_FONT_OFFSETS.wavePopupY, "hud-font");
       sprite.setFrame(char.frame);
+      sprite.setOrigin(0, 0.5); // Left-aligned origin to match atlas glyph left-alignment
       sprite.setScale(0.1);
       sprite.setScrollFactor(0);
       sprite.setDepth(200000); // Float above EVERYTHING

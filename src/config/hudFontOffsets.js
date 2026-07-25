@@ -1,6 +1,6 @@
 export const HUD_FONT_OFFSETS = {
   wavePopupY: 0,
-  healthDigitY: -2,
+  healthDigitY: -3,
   enemyWordY: 0,
 };
 
