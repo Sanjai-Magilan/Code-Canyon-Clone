@@ -15,6 +15,7 @@ import waveCompletedAudio from "../assets/Sounds/level completed/levelCompleted.
 import CAMERA_CONFIG from "../config/cameraConfig";
 import WORLD_CONFIG from "../config/worldConfig";
 import ENEMY_CONFIG from "../config/enemyConfig";
+import { DAMAGE_SOURCE } from "../config/damageSources";
 import wormRun from "../assets/Sprites/Enemy/run/worm_run.png";
 import explosionSheet from "../assets/Sprites/Enemy/explosion/explosion-sheet.png";
 import shadowImg from "../assets/Sprites/Enemy/worm-shadow.png";
@@ -152,7 +153,7 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("health-bar-holder", healthBarImg);
     this.load.spritesheet("hud-font", hudFontImg, {
       frameWidth: 165,
-      frameHeight: 157
+      frameHeight: 154
     });
     this.load.image("lightning-icon", lightningIconImg);
     this.load.spritesheet("lightning-beam", beamImg, {
@@ -771,37 +772,25 @@ export default class GameScene extends Phaser.Scene {
 
     // Camera Shake & Camera Zoom Punch
     if (this.player?.sprite) {
-      const distance = Phaser.Math.Distance.Between(x, y, this.player.sprite.x, this.player.sprite.y);
+      const now = this.time.now;
+      // Throttle camera shake and zoom punch (maximum 1 action every 30ms)
+      if (now - (this.lastExplosionShakeTime || 0) >= 30) {
+        this.lastExplosionShakeTime = now;
 
-      // Distance multiplier
-      let distMult = 0;
-      if (distance < 300) {
-        distMult = 1.0;
-      } else if (distance < 600) {
-        distMult = 0.5;
-      }
+        // Determine shake parameters based on enemy size/type
+        const isBig = enemyType === "angler";
+        const duration = isBig ? 75 : 50;
+        const intensity = isBig ? 0.0045 : 0.003;
 
-      if (distMult > 0) {
-        const now = this.time.now;
-        // Throttle camera shake and zoom punch (maximum 1 action every 30ms)
-        if (now - (this.lastExplosionShakeTime || 0) >= 30) {
-          this.lastExplosionShakeTime = now;
+        this.cameras.main.shake(duration, intensity);
 
-          // Determine shake parameters based on enemy size/type
-          const isBig = enemyType === "angler";
-          const duration = isBig ? 75 : 50;
-          const intensity = (isBig ? 0.0045 : 0.003) * distMult;
-
-          this.cameras.main.shake(duration, intensity);
-
-          // Camera Zoom Punch (zoom to 1.012, yoyo back in 30ms)
-          this.tweens.add({
-            targets: this.cameras.main,
-            zoom: 1.012,
-            duration: 30,
-            yoyo: true
-          });
-        }
+        // Camera Zoom Punch (zoom to 1.012, yoyo back in 30ms)
+        this.tweens.add({
+          targets: this.cameras.main,
+          zoom: 1.012,
+          duration: 30,
+          yoyo: true
+        });
       }
     }
   }
@@ -810,11 +799,11 @@ export default class GameScene extends Phaser.Scene {
     // Deal damage to the player, passing the enemy sprite as the source
     this.player.takeDamage(ENEMY_CONFIG.collisionDamage, enemySprite);
 
-    // Find and destroy the enemy wrapper via its unified die method
+    // Find and damage the enemy wrapper via its unified applyDamage method
     const index = this.enemies.findIndex((e) => e.sprite === enemySprite);
     if (index !== -1) {
       const enemy = this.enemies[index];
-      enemy.die();
+      enemy.applyDamage(enemy.maxHealth, DAMAGE_SOURCE.COLLISION);
     }
   }
 
@@ -1278,9 +1267,9 @@ export default class GameScene extends Phaser.Scene {
 
         beam.once("animationcomplete", () => {
           beam.destroy();
-          // Kill the enemy and trigger normal drops / XP
-          if (enemy && typeof enemy.die === "function") {
-            enemy.die();
+          // Kill the enemy and trigger normal drops / XP via applyDamage
+          if (enemy && typeof enemy.applyDamage === "function") {
+            enemy.applyDamage(enemy.maxHealth, DAMAGE_SOURCE.LIGHTNING);
           }
         });
       });

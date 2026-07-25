@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import ENEMY_CONFIG from "../config/enemyConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
+import { DAMAGE_SOURCE } from "../config/damageSources";
 
 export default class Enemy {
   /**
@@ -120,23 +121,30 @@ export default class Enemy {
     return null;
   }
 
-  /**
-   * Applies damage to the enemy.
-   * @param {number} amount Damage quantity
-   */
-  takeDamage(amount) {
+  applyDamage(amount, source = DAMAGE_SOURCE.BULLET) {
     if (this.isDead) return;
     this.health -= amount;
+    console.log(`[Damage System] ${this.id} took ${amount} damage from ${source}. Remaining HP: ${this.health}`);
     if (this.health <= 0) {
-      this.die();
+      this.die(source);
     }
   }
 
   /**
-   * Handles enemy death, including lists splicing, explosions, and pickups.
+   * Restores health to the enemy.
+   * @param {number} amount Health quantity to restore
    */
-  die() {
-    console.log(`[Typing Pipeline] die() called for ${this.id}`);
+  heal(amount) {
+    if (this.isDead) return;
+    this.health = Math.min(this.health + amount, this.maxHealth);
+  }
+
+  /**
+   * Handles enemy death, including lists splicing, explosions, and pickups.
+   * @param {string} source Source type of the death
+   */
+  die(source = DAMAGE_SOURCE.UNKNOWN) {
+    console.log(`[Typing Pipeline] die() called for ${this.id} from source: ${source}`);
     if (this.isDead) return;
     this.isDead = true;
 
@@ -239,21 +247,11 @@ export default class Enemy {
     }
   }
 
-  /**
-   * Handles typing-combat bullet hit decision making.
-   * @param {boolean} isFinalTypingShot Whether this bullet completes the word
-   */
   handleTypingBulletHit(isFinalTypingShot) {
-    console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id}: isFinalTypingShot=${isFinalTypingShot} isDead=${this.isDead}`);
+    console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id}: isDead=${this.isDead}`);
     if (this.isDead) return;
 
-    if (isFinalTypingShot) {
-      console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id} calling die()`);
-      this.die();
-    } else {
-      console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id} calling advanceProgress()`);
-      this.advanceProgress();
-    }
+    this.applyDamage(this.maxHealth, DAMAGE_SOURCE.TYPING);
   }
 
   /**

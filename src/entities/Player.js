@@ -800,7 +800,7 @@ export default class Player {
     const muzzle = this.getMuzzlePosition();
 
     // Delegate cooldown check and get spawn parameters using the exact angle
-    const shotInfo = this.weapon.fire(muzzle, angle);
+    const shotInfo = this.weapon.fire(muzzle, angle, true);
     if (!shotInfo) {
       return;
     }

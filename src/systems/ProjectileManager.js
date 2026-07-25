@@ -1,5 +1,6 @@
 import Bullet from "../entities/Bullet";
 import BULLET_CONFIG from "../config/bulletConfig";
+import { DAMAGE_SOURCE } from "../config/damageSources";
 
 export default class ProjectileManager {
   /**
@@ -206,38 +207,19 @@ export default class ProjectileManager {
       }
     } else {
       // Fallback for any non-typed damage (if any exist)
-      if (typeof enemy.takeDamage === "function") {
-        enemy.takeDamage(damage);
+      if (typeof enemy.applyDamage === "function") {
+        enemy.applyDamage(damage, DAMAGE_SOURCE.BULLET);
       } else {
         enemy.health -= damage;
         if (enemy.health <= 0) {
-          enemy.die();
+          enemy.die(DAMAGE_SOURCE.BULLET);
         }
       }
     }
   }
 
-  /**
-   * Applies area-of-effect explosion damage in a radius.
-   * @param {number} x X coordinate of explosion
-   * @param {number} y Y coordinate of explosion
-   * @param {number} damage Damage value to apply
-   */
   triggerExplosionDamage(x, y, damage, targetEnemy = null) {
-    try {
-      const scene = this.scene;
-
-      // Visual explosion effect only
-      if (typeof scene.spawnEnemyExplosion === "function") {
-        scene.spawnEnemyExplosion(x, y);
-      }
-
-      // If we have a target enemy, let it advance its progress
-      if (targetEnemy && typeof targetEnemy.advanceProgress === "function") {
-        targetEnemy.advanceProgress();
-      }
-    } catch (err) {
-      console.error("CRITICAL EXPLOSION ERROR:", err);
-    }
+    // Centralized death effects are now handled exclusively inside the enemy's die() flow,
+    // which prevents duplicate explosions, duplicate camera shakes, and typing progress desyncs.
   }
 }

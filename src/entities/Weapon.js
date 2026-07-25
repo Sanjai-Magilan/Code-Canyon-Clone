@@ -26,15 +26,17 @@ export default class Weapon {
    * @param {boolean} isFlipped Flipped direction state of owner
    * @returns {object[]|null} Array of spawn details if bullets fired, null if blocked by cooldown
    */
-  fire(muzzlePosition, isFlipped) {
+  fire(muzzlePosition, isFlipped, ignoreCooldown = false) {
     const timeNow = this.scene.time.now;
     
     // Cooldown check (Fire Rate)
-    if (timeNow - this.lastFired < this.config.fireRate) {
+    if (!ignoreCooldown && (timeNow - this.lastFired < this.config.fireRate)) {
       return null;
     }
 
-    this.lastFired = timeNow;
+    if (!ignoreCooldown) {
+      this.lastFired = timeNow;
+    }
 
     const baseAngle = typeof isFlipped === "number"
       ? isFlipped
