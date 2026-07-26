@@ -98,13 +98,10 @@ export default class HudFontHelper {
     if (char === '.') return 62;
     if (char === '!') return 63;
     if (char === '?') return 64;
-    if (char === '-') return 65;
-    if (char === '[') return 66;
-    if (char === ']') return 67;
-    if (char === ':') return 68;
+    if (char === '-') return 68;
+    if (char === ':') return 65;
     if (char === '\'') return 69;
-    if (char === '>') return 72;
-    if (char === '<') return 73;
+   
     return null;
   }
 
