@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import bg from "../assets/Sprites/BG/floor/tiledfloor.png";
 import powerUpAudio from "../assets/Sounds/powerUp.webm";
+import hudFontImg from "../assets/Sprites/font/fonth.png";
+import HudFontHelper from "../utils/HudFontHelper";
 
 export default class MainMenuScene extends Phaser.Scene {
   constructor() {
@@ -10,28 +12,33 @@ export default class MainMenuScene extends Phaser.Scene {
   preload() {
     this.load.image("bg", bg);
     this.load.audio("power-up", powerUpAudio);
+    this.load.spritesheet("hud-font", hudFontImg, {
+      frameWidth: 165,
+      frameHeight: 154
+    });
   }
 
   create() {
     // 1. Canvas Background (1920x1080)
     this.add.image(960, 540, "bg").setOrigin(0.5).setDisplaySize(1920, 1080);
 
-    // Subtle dark base overlay for background contrast
+    // Dark base overlay for background contrast
     const baseOverlay = this.add.graphics();
     baseOverlay.fillStyle(0x000000, 0.45);
     baseOverlay.fillRect(0, 0, 1920, 1080);
 
-    // 2. Retro Arcade Main Title (Large, Green, Gentle Floating Animation)
-    const titleText = this.add.text(960, 115, "BUG BLASTER", {
-      fontSize: "84px",
-      fontFamily: "monospace",
-      color: "#00ff00",
-      fontStyle: "bold"
-    }).setOrigin(0.5).setShadow(5, 5, "#000000", 6);
+    // 2. Retro Main Title rendered with proportional bitmap HUD font (Large, Green)
+    const titleSprites = HudFontHelper.renderText(this, 960, 115, "BUG BLASTER", {
+      scale: 0.55,
+      tint: 0x00ff00,
+      align: "center",
+      letterSpacing: 14,
+      depth: 100
+    });
 
-    // Floating motion for main title
+    // Floating motion for main title sprites
     this.tweens.add({
-      targets: titleText,
+      targets: titleSprites,
       y: 105,
       duration: 1500,
       yoyo: true,
@@ -39,7 +46,7 @@ export default class MainMenuScene extends Phaser.Scene {
       ease: "Sine.easeInOut"
     });
 
-    // 3. How To Play Panel (Semi-transparent 70% dark panel with green pixel-style border)
+    // 3. How To Play Panel (Semi-transparent 72% dark panel with green pixel-style border)
     const panelX = 410;
     const panelY = 210;
     const panelW = 1100;
@@ -57,78 +64,84 @@ export default class MainMenuScene extends Phaser.Scene {
     panelGraphics.strokeRoundedRect(panelX + 6, panelY + 6, panelW - 12, panelH - 12, 12);
 
     // Panel Section Heading (Medium, Yellow)
-    this.add.text(960, 255, "HOW TO PLAY", {
-      fontSize: "36px",
-      fontFamily: "monospace",
-      color: "#ffff00",
-      fontStyle: "bold"
-    }).setOrigin(0.5).setShadow(2, 2, "#000000", 4);
+    HudFontHelper.renderText(this, 960, 255, "HOW TO PLAY", {
+      scale: 0.32,
+      tint: 0xffff00,
+      align: "center",
+      letterSpacing: 12,
+      depth: 100
+    });
 
-    // 4. Controls Section (Two-Column Layout with Keycap Badges)
-    const controlsY = 325;
-
-    // Controls Data
+    // 4. Controls Section (Two-Column Layout with Cyan Keycap Badges)
     const controls = [
-      { label: "Move", keycap: "[ ARROW KEYS ]", y: controlsY },
-      { label: "Dash", keycap: "[ SPACE ]", y: controlsY + 45 },
-      { label: "Thunder", keycap: "[ 1 ]", y: controlsY + 90 }
+      { label: "MOVE -", keycap: " ARROW KEYS ", y: 325 },
+      { label: "DASH -" , keycap: " SPACE ", y: 370 },
+      { label: "THUNDER -", keycap: " 1 ", y: 415 }
     ];
 
     controls.forEach(ctrl => {
-      // Left Column: Control Name (Right-aligned to 900)
-      this.add.text(900, ctrl.y, ctrl.label, {
-        fontSize: "24px",
-        fontFamily: "monospace",
-        color: "#ffffff",
-        fontStyle: "bold"
-      }).setOrigin(1, 0.5).setShadow(2, 2, "#000000", 3);
+      // Left Column: Control Name (White)
+      HudFontHelper.renderText(this, 880, ctrl.y, ctrl.label, {
+        scale: 0.22,
+        tint: 0xffffff,
+        align: "right",
+        letterSpacing: 10,
+        depth: 100
+      });
 
-      // Right Column: Keycap Badge (Left-aligned at 940)
-      this.add.text(940, ctrl.y, ctrl.keycap, {
-        fontSize: "24px",
-        fontFamily: "monospace",
-        color: "#00ffff",
-        fontStyle: "bold"
-      }).setOrigin(0, 0.5).setShadow(2, 2, "#000000", 3);
+      // Right Column: Keycap Badge (Cyan)
+      HudFontHelper.renderText(this, 940, ctrl.y, ctrl.keycap, {
+        scale: 0.22,
+        tint: 0x00ffff,
+        align: "left",
+        letterSpacing: 10,
+        depth: 100
+      });
     });
 
     // Panel Separator Line
-    const sepY = 485;
+    const sepY = 475;
     const sepGraphics = this.add.graphics();
     sepGraphics.lineStyle(2, 0x444444, 0.8);
     sepGraphics.lineBetween(panelX + 60, sepY, panelX + panelW - 60, sepY);
 
-    // 5. Game Instructions Section inside Panel
-    this.add.text(960, 525, "Type the word above each bug to defeat it.", {
-      fontSize: "24px",
-      fontFamily: "monospace",
-      color: "#ffffff"
-    }).setOrigin(0.5).setShadow(2, 2, "#000000", 3);
+    // 5. Game Instructions Section inside Panel (Bitmap HUD font)
+    HudFontHelper.renderText(this, 960, 520, "TYPE THE WORD ABOVE EACH BUG TO DEFEAT IT.", {
+      scale: 0.20,
+      tint: 0xffffff,
+      align: "center",
+      letterSpacing: 8,
+      depth: 100
+    });
 
-    this.add.text(960, 580, "Defeat 5 enemies in a row to charge Thunder.", {
-      fontSize: "24px",
-      fontFamily: "monospace",
-      color: "#ffffff"
-    }).setOrigin(0.5).setShadow(2, 2, "#000000", 3);
+    HudFontHelper.renderText(this, 960, 575, "DEFEAT 5 ENEMIES IN A ROW TO CHARGE THUNDER.", {
+      scale: 0.20,
+      tint: 0xffffff,
+      align: "center",
+      letterSpacing: 8,
+      depth: 100
+    });
 
     // Warning Instruction (Red)
-    this.add.text(960, 645, "Don't let the bugs reach you!", {
-      fontSize: "26px",
-      fontFamily: "monospace",
-      color: "#ff4444",
-      fontStyle: "bold"
-    }).setOrigin(0.5).setShadow(2, 2, "#000000", 4);
+    HudFontHelper.renderText(this, 960, 640, "DONT LET THE BUGS REACH YOU", {
+      scale: 0.22,
+      tint: 0xff4444,
+      align: "center",
+      letterSpacing: 10,
+      depth: 100
+    });
 
-    // 6. Bottom Start Prompt (Visually Prominent, Pulsing Animation)
-    const promptText = this.add.text(960, 885, "►  PRESS ANY KEY TO START  ◄", {
-      fontSize: "40px",
-      fontFamily: "monospace",
-      color: "#00ff00",
-      fontStyle: "bold"
-    }).setOrigin(0.5).setShadow(4, 4, "#000000", 5);
+    // 6. Bottom Start Prompt (Bitmap HUD font, Green, Pulsing Animation)
+    const promptSprites = HudFontHelper.renderText(this, 960, 885, ">  PRESS ANY KEY TO START  <", {
+      scale: 0.32,
+      tint: 0x00ff00,
+      align: "center",
+      letterSpacing: 12,
+      depth: 100
+    });
 
     this.tweens.add({
-      targets: promptText,
+      targets: promptSprites,
       alpha: 0.15,
       duration: 650,
       yoyo: true,
