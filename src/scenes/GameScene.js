@@ -616,11 +616,8 @@ export default class GameScene extends Phaser.Scene {
 
   applyDepthSorting() {
     const playerSprite = this.player.getSprite();
-    playerSprite.setDepth(playerSprite.y);
-    this.player.head.setDepth(playerSprite.y + 0.1);
-    this.player.gun.setDepth(playerSprite.y + 0.2);
-    if (this.player.flash?.active) {
-      this.player.flash.setDepth(playerSprite.y + 0.3);
+    if (this.player.visual) {
+      this.player.visual.setDepth(playerSprite.y);
     }
 
     for (const enemy of this.enemies) {

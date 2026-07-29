@@ -40,12 +40,18 @@ export default class PlayerDustEmitter {
     const actualDelta = (delta !== undefined) ? delta : (this.scene.game?.loop?.delta || 16.66);
     const dt = actualDelta / 16.66;
 
-    // 1. Process any pending micro-staggered particle spawns due at actualTime
+    // 1. Process any pending micro-staggered particle spawns due at actualTime ($O(1)$ swap-pop removal)
     for (let i = this.pendingSpawns.length - 1; i >= 0; i--) {
       const item = this.pendingSpawns[i];
       if (actualTime >= item.timeToSpawn) {
         this.spawnSingleParticle(item.vx, item.vy);
-        this.pendingSpawns.splice(i, 1);
+
+        // Fast O(1) swap with tail and pop (zero memory allocation)
+        const lastIdx = this.pendingSpawns.length - 1;
+        if (i < lastIdx) {
+          this.pendingSpawns[i] = this.pendingSpawns[lastIdx];
+        }
+        this.pendingSpawns.pop();
       }
     }
 
@@ -63,10 +69,12 @@ export default class PlayerDustEmitter {
       }
     }
 
-    // 3. Update active particles with 3-phase turbulent cloud physics & delayed fade/shrink
+    // 3. Pre-compute frame-level constants outside particle loop
     const dragFactor = Math.pow(0.86, dt);
     const expandDuration = 50; // ms initial expansion puff
+    const halfPi = Math.PI / 2;
 
+    // 4. Update active particles with 3-phase turbulent cloud physics
     for (let i = this.activeParticles.length - 1; i >= 0; i--) {
       const p = this.activeParticles[i];
       p.lifetime -= actualDelta;
@@ -116,7 +124,7 @@ export default class PlayerDustEmitter {
         let scaleMultiplier = 1.0;
         if (elapsed < expandDuration) {
           const norm = elapsed / expandDuration;
-          scaleMultiplier = 1.0 + 0.15 * Math.sin(norm * Math.PI / 2);
+          scaleMultiplier = 1.0 + 0.15 * Math.sin(norm * halfPi);
         } else if (progress >= 0.2) {
           const norm = (progress - 0.2) / 0.8;
           scaleMultiplier = 0.40 + 0.75 * norm;
@@ -140,7 +148,7 @@ export default class PlayerDustEmitter {
    * @param {number} now Current scene timestamp in ms
    */
   triggerStaggeredBurst(playerVx, playerVy, now) {
-    const count = Phaser.Math.Between(5,5);
+    const count = Phaser.Math.Between(5, 8);
     let delayOffset = 0;
 
     for (let i = 0; i < count; i++) {
@@ -230,7 +238,7 @@ export default class PlayerDustEmitter {
       p.sprite.setVisible(true);
       p.sprite.setActive(true);
 
-      // Reset state properties
+      // Reset state properties in place (zero object allocation)
       p.lifetime = maxLifetime;
       p.maxLifetime = maxLifetime;
       p.vx = vx;
@@ -245,13 +253,13 @@ export default class PlayerDustEmitter {
       p.sprite.setAngle(angle);
       p.sprite.setAlpha(initialAlpha);
       p.sprite.setScale(initialScale);
-      p.sprite.setDepth(sprite.depth - 0.2);
+      // NOTE: setDepth is omitted on recycled objects to avoid triggering scene display list re-sorts
     } else {
       const pSprite = this.scene.add.image(spawnX, spawnY, "player-dust");
       pSprite.setAngle(angle);
       pSprite.setAlpha(initialAlpha);
       pSprite.setScale(initialScale);
-      pSprite.setDepth(sprite.depth - 0.2);
+      pSprite.setDepth(sprite.depth - 0.2); // Set depth ONCE upon original creation
 
       p = {
         sprite: pSprite,
@@ -272,14 +280,20 @@ export default class PlayerDustEmitter {
   }
 
   /**
-   * Recycles an active particle back into the object pool.
+   * Recycles an active particle back into the object pool via O(1) swap & pop.
    * @param {object} p The particle wrapper object
    * @param {number} index Index in activeParticles array
    */
   recycleParticle(p, index) {
     p.sprite.setVisible(false);
     p.sprite.setActive(false);
-    this.activeParticles.splice(index, 1);
+
+    // Fast O(1) swap with tail and pop (zero memory re-allocation)
+    const lastIdx = this.activeParticles.length - 1;
+    if (index < lastIdx) {
+      this.activeParticles[index] = this.activeParticles[lastIdx];
+    }
+    this.activeParticles.pop();
     this.pool.push(p);
   }
 

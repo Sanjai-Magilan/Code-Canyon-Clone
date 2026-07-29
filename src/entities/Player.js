@@ -4,7 +4,7 @@ import CHARACTERS from "../config/characterConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 import PLAYER_CONFIG from "../config/playerConfig";
 import PlayerDustEmitter from "../systems/PlayerDustEmitter";
-import HEAD_OFFSETS from "../config/headOffsets";
+import PlayerVisual from "./PlayerVisual";
 
 export default class Player {
   /**
@@ -27,14 +27,6 @@ export default class Player {
     this.health = PLAYER_CONFIG.maxHealth;
     this.maxHealth = PLAYER_CONFIG.maxHealth;
 
-    // --- Visual Offsets & Recoil Parameters ---
-    this.headOffset = this.characterConfig.headOffset;
-    this.headFloatAmplitude = this.characterConfig.headFloatAmplitude;
-    this.headFloatSpeed = this.characterConfig.headFloatSpeed;
-    this.gunOffset = this.characterConfig.gunOffset;
-    this.recoilOffset = 0; // Visual recoil offset
-    this.recoilAngle = 0;  // Visual recoil angle rotation
-
     // --- Interaction System ---
     this.interactionSystem = {
       interact: () => {
@@ -56,7 +48,6 @@ export default class Player {
 
     // --- Shield State ---
     this.hasShield = false;
-    this.shield = null;
     this.shieldDirection = "right";
     this.shieldHitsRemaining = 0;
 
@@ -69,37 +60,20 @@ export default class Player {
 
     this.spaceKey = this.scene?.input?.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) || null;
 
+    // --- Physics Body Creation ---
+    this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
+    this.sprite.setScale(this.characterConfig.scale);
+    this.sprite.setCollideWorldBounds(true);
+    // Physics body handles movement/collisions; PlayerVisual handles visual rendering
+    this.sprite.setVisible(false);
+
+    // --- Visual Container System ---
+    this.visual = new PlayerVisual(this.scene, this);
+
     // Initialize running dust emitter system
     this.dustEmitter = new PlayerDustEmitter(this.scene, this);
 
-    // --- Sprite & Physics Creation ---
-    this.sprite = this.scene.physics.add.sprite(x, y, this.characterConfig.bodyTexture);
-    this.sprite.setScale(this.characterConfig.scale);
-
-    // Constrain the sprite to world bounds
-    this.sprite.setCollideWorldBounds(true);
-    this.shadow = this.scene.add.image(x, y + 40, this.characterConfig.shadowTexture);
-    this.shadow.setScale(this.characterConfig.scale);
-    this.shadow.setDepth(this.characterConfig.depth - 1);
-
-    // --- Attachment Images Creation ---
-    this.head = this.scene.add.image(x, y, this.characterConfig.headTexture);
-    this.head.setScale(this.characterConfig.scale);
-    this.gun = this.scene.add.image(x, y, this.characterConfig.gunTexture);
-    this.gun.setScale(this.characterConfig.scale);
-
-    // Set depths so elements overlay correctly
-    this.sprite.setDepth(this.characterConfig.depth);
-    this.head.setDepth(this.characterConfig.depth + 1);
-    this.gun.setDepth(this.characterConfig.depth + 2);
-
-    // --- Animation Creation ---
-    this.createAnimations();
-
-    // Play default run animation (starts playing immediately)
-    this.sprite.play(`${this.characterConfig.bodyTexture}-run`);
-
-    // --- Solve the Physics Position Lag ---
+    // --- Solve Physics Position Lag ---
     this.scene.events.on(
       Phaser.Scenes.Events.POST_UPDATE,
       this.postUpdate,
@@ -113,6 +87,13 @@ export default class Player {
     this.sprite.on(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
 
+  // --- Backward Compatibility Getters ---
+  get head() { return this.visual?.head; }
+  get gun() { return this.visual?.gun; }
+  get flash() { return this.visual?.flash; }
+  get shadow() { return this.visual?.shadow; }
+  get shield() { return this.visual?.shield; }
+
   /**
    * Expose the underlying Phaser physics sprite
    * @returns {Phaser.Physics.Arcade.Sprite}
@@ -122,20 +103,22 @@ export default class Player {
   }
 
   /**
-   * Internal helper to register character animations dynamically.
+   * Safely swaps the player's head.
+   * @param {string} headKey Texture key for the new head
    */
-  createAnimations() {
-    const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
-    if (!this.scene.anims.exists(runAnimKey)) {
-      this.scene.anims.create({
-        key: runAnimKey,
-        frames: this.scene.anims.generateFrameNumbers(this.characterConfig.bodyTexture, {
-          start: this.characterConfig.anim.run.start,
-          end: this.characterConfig.anim.run.end,
-        }),
-        frameRate: this.characterConfig.anim.run.frameRate,
-        repeat: -1,
-      });
+  setHead(headKey) {
+    if (this.visual) {
+      this.visual.setHead(headKey);
+    }
+  }
+
+  /**
+   * Safely swaps the player's gun.
+   * @param {string} gunKey Texture key for the new gun
+   */
+  setGun(gunKey) {
+    if (this.visual) {
+      this.visual.setGun(gunKey);
     }
   }
 
@@ -176,14 +159,16 @@ export default class Player {
       this.lastMoveDirection.copy(this.currentDirVector).normalize();
     }
 
-    // Handle horizontal movement
+    // Handle horizontal movement & flip state
     if (leftDown) {
       this.sprite.setVelocityX(-this.speed);
       this.sprite.setFlipX(true);
+      this.visual.setFlip(true);
       isMoving = true;
     } else if (rightDown) {
       this.sprite.setVelocityX(this.speed);
       this.sprite.setFlipX(false);
+      this.visual.setFlip(false);
       isMoving = true;
     }
 
@@ -204,87 +189,31 @@ export default class Player {
     // Animation state machine logic
     const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
     if (isMoving) {
-      if (
-        !this.sprite.anims.isPlaying ||
-        this.sprite.anims.currentAnim.key !== runAnimKey
-      ) {
-        this.sprite.play(runAnimKey);
-      }
+      this.visual.playAnimation(runAnimKey);
     } else {
-      this.sprite.stop();
-      this.sprite.setFrame(0);
+      this.visual.stopAnimation(0);
     }
   }
 
   /**
-   * Sync positions of attachments post-update to eliminate 1-frame position lag.
+   * Sync positions of attachments post-update to eliminate position lag.
    * This executes after physics updates body position but before rendering.
    */
   postUpdate(time, delta) {
     if (!this.sprite || !this.sprite.active) return;
+
+    // Sync container position to match physics body
+    this.visual.setPosition(this.sprite.x, this.sprite.y);
+    this.visual.update(time, delta);
 
     // Update player running dust particles
     if (this.dustEmitter) {
       this.dustEmitter.update(time, delta);
     }
 
-    // Snappy math-based exponential visual recoil decay (zero dynamic allocations)
-    this.recoilOffset *= this.characterConfig.recoil.offsetDecay;
-    if (Math.abs(this.recoilOffset) < 0.1) {
-      this.recoilOffset = 0;
-    }
-
-    this.recoilAngle *= this.characterConfig.recoil.angleDecay;
-    if (Math.abs(this.recoilAngle) < 0.1) {
-      this.recoilAngle = 0;
-    }
-
-    // Flip offsets horizontally based on sprite direction
-    const flipMultiplier = this.sprite.flipX ? -1 : 1;
-    const shadowOffsetX = this.sprite.flipX ? -0 : 0;
-
-    this.shadow.setPosition(this.sprite.x + shadowOffsetX, this.sprite.y + 30);
-    this.shadow.setFlipX(this.sprite.flipX);
-
-    // Lookup head offset dynamically based on current head texture
-    const offset = HEAD_OFFSETS[this.head.texture.key] || this.headOffset;
-
-    const headBob =
-      Math.sin(this.scene.time.now * this.headFloatSpeed) *
-      this.headFloatAmplitude;
-
-    this.head.setPosition(
-      this.sprite.x + offset.x * flipMultiplier,
-      this.sprite.y + offset.y + headBob,
-    );
-    this.gun.setPosition(
-      this.sprite.x + (this.gunOffset.x + this.recoilOffset) * flipMultiplier,
-      this.sprite.y + this.gunOffset.y,
-    );
-
-    // Apply visual recoil angle
-    this.gun.angle = this.recoilAngle;
-
-    // Sync flip states
-    this.head.setFlipX(this.sprite.flipX);
-    this.gun.setFlipX(this.sprite.flipX);
-    if (this.flash?.active) {
-      const muzzle = this.getMuzzlePosition();
-      this.flash.setPosition(muzzle.x, muzzle.y);
-      this.flash.setFlipX(this.sprite.flipX);
-    }
-
-    // Update shield position, rotation, and flip matching the player's facing direction
-    if (this.shield) {
-      this.shieldDirection = this.sprite.flipX ? "left" : "right";
-
-      const ox = this.sprite.flipX ? -50 : 50;
-      const oy = -10;
-
-      this.shield.setPosition(this.sprite.x + ox, this.sprite.y + oy);
-      this.shield.setFlipX(this.sprite.flipX);
-      this.shield.setRotation(0);
-      this.shield.setAlpha(this.sprite.alpha);
+    // Sync shield facing direction property
+    if (this.visual.shield) {
+      this.shieldDirection = this.visual.isFlipped ? "left" : "right";
     }
   }
 
@@ -301,8 +230,7 @@ export default class Player {
   }
 
   /**
-   * Cleanup method to destroy children and detach scene event listeners
-   * to avoid memory leaks.
+   * Cleanup method to destroy children and detach scene event listeners.
    */
   destroy() {
     if (this.isDestroyed) return;
@@ -336,10 +264,11 @@ export default class Player {
       this.destroyGameObject(this.sprite, sceneShutdown);
       this.sprite = null;
     }
-    this.head = this.destroyGameObject(this.head, sceneShutdown);
-    this.gun = this.destroyGameObject(this.gun, sceneShutdown);
-    this.flash = this.destroyGameObject(this.flash, sceneShutdown);
-    this.shadow = this.destroyGameObject(this.shadow, sceneShutdown);
+
+    if (this.visual) {
+      this.visual.destroy();
+      this.visual = null;
+    }
 
     if (this.dustEmitter) {
       this.dustEmitter.destroy();
@@ -366,12 +295,8 @@ export default class Player {
     this.isDashing = true;
     this.canDash = false;
 
-    // Visual effect: make player slightly transparent
-    this.sprite.setAlpha(0.7);
-    if (this.head) this.head.setAlpha(0.7);
-    if (this.gun) this.gun.setAlpha(0.7);
-    if (this.shadow) this.shadow.setAlpha(0.7);
-    if (this.shield) this.shield.setAlpha(0.7);
+    // Visual effect: make container slightly transparent
+    this.visual.container.setAlpha(0.7);
 
     // Calculate direction and speed
     const dir = this.lastMoveDirection.clone().normalize();
@@ -381,21 +306,17 @@ export default class Player {
 
     // Keep running animation active
     const runAnimKey = `${this.characterConfig.bodyTexture}-run`;
-    if (!this.sprite.anims.isPlaying || this.sprite.anims.currentAnim.key !== runAnimKey) {
-      this.sprite.play(runAnimKey);
-    }
+    this.visual.playAnimation(runAnimKey);
 
     // End dash after duration
     this.dashTimer = this.scene.time.delayedCall(PLAYER_CONFIG.dash.duration, () => {
       this.isDashing = false;
       if (this.sprite?.body) {
         this.sprite.setVelocity(0, 0);
-        this.sprite.setAlpha(1.0);
       }
-      if (this.head) this.head.setAlpha(1.0);
-      if (this.gun) this.gun.setAlpha(1.0);
-      if (this.shadow) this.shadow.setAlpha(1.0);
-      if (this.shield) this.shield.setAlpha(1.0);
+      if (this.visual?.container) {
+        this.visual.container.setAlpha(1.0);
+      }
 
       // Start cooldown timer
       this.dashCooldownTimer = this.scene.time.delayedCall(PLAYER_CONFIG.dash.cooldown, () => {
@@ -444,14 +365,11 @@ export default class Player {
   takeDamage(amount, source = null) {
     if (this.isDead || this.isDashing) return;
 
-    console.trace("takeDamage called");
-
     if (this.checkShieldBlock(source)) {
       return;
     }
 
     if (this.isInvincible) {
-      console.log("Damage ignored due to iFrames");
       return;
     }
 
@@ -459,18 +377,9 @@ export default class Player {
     this.scene?.sound?.play("player-oof", { volume: 0.3 });
 
     this.health = Math.max(0, this.health - 1);
-    console.log("Health:", this.health);
-    console.trace("health changed");
-    console.log(
-      "Player hit",
-      this.health,
-      this.scene?.time?.now
-    );
-
     this.scene?.updateHearts?.();
 
     if (this.health <= 0) {
-      console.log("Calling die()");
       this.die();
     } else {
       this.startInvincibility();
@@ -484,7 +393,6 @@ export default class Player {
   heal(amount) {
     if (this.isDead) return;
     this.health = Math.min(this.maxHealth, this.health + amount);
-    console.trace("health changed");
     this.scene?.updateHearts?.();
   }
 
@@ -496,8 +404,6 @@ export default class Player {
     this.isDead = true;
 
     this.destroyShield();
-
-    console.log("Player died");
     this.clearInvincibilityTimers();
     this.setPlayerAlpha(1.0);
 
@@ -506,19 +412,14 @@ export default class Player {
       this.sprite.setVelocity(0, 0);
     }
     this.sprite.disableBody(true, true);
-    if (this.head) this.head.setVisible(false);
-    if (this.gun) this.gun.setVisible(false);
-    if (this.shadow) this.shadow.setVisible(false);
+    this.visual.setVisible(false);
 
     // Shake camera slightly
     this.scene?.cameras?.main?.shake(300, 0.02);
 
     // Restart the scene after 1000ms delay using Phaser's Clock
-    console.log("Restart timer started");
     this.scene?.time?.delayedCall(1000, () => {
-      console.log("Restart callback entered");
       try {
-        console.log("Scene restarting");
         this.scene?.scene?.restart();
       } catch (err) {
         console.error("CRITICAL ERROR RESTARTING SCENE:", err);
@@ -538,11 +439,7 @@ export default class Player {
 
     this.hasShield = true;
     this.shieldHitsRemaining = 3;
-
-    // Create shield sprite attached to player
-    this.shield = this.scene.add.image(this.sprite.x, this.sprite.y, "shield-sprite");
-    this.shield.setScale(this.characterConfig.scale * 1.4);
-    this.shield.setDepth(this.sprite.depth + 1);
+    this.visual.equipShield("shield-sprite");
   }
 
   /**
@@ -552,11 +449,8 @@ export default class Player {
   destroyShield(sceneShutdown = false) {
     this.hasShield = false;
     this.shieldHitsRemaining = 0;
-    if (this.shield) {
-      if (!sceneShutdown && this.shield.active) {
-        this.shield.destroy();
-      }
-      this.shield = null;
+    if (this.visual) {
+      this.visual.removeShield();
     }
     // Clear shield power-up UI
     this.scene?.clearShieldPowerup?.();
@@ -580,412 +474,169 @@ export default class Player {
       }
 
       // Shake and flash shield
-      if (this.shield) {
+      if (this.visual?.shield) {
         this.scene.tweens.add({
-          targets: this.shield,
-          x: this.shield.x + Phaser.Math.Between(-6, 6),
-          y: this.shield.y + Phaser.Math.Between(-6, 6),
+          targets: this.visual.shield,
+          x: this.visual.shield.x + Phaser.Math.Between(-6, 6),
+          y: this.visual.shield.y + Phaser.Math.Between(-6, 6),
           duration: 50,
           yoyo: true,
           repeat: 2
         });
 
-        this.shield.setTint(0xffffff);
+        this.visual.shield.setTint(0xffffff);
         this.scene.time.delayedCall(100, () => {
-          if (this.shield) this.shield.clearTint();
+          if (this.visual?.shield) this.visual.shield.clearTint();
         });
       }
     }
 
     if (this.shieldHitsRemaining <= 0) {
-      this.breakShield();
-    }
-  }
-
-  /**
-   * Breaks the shield and runs break fade animation.
-   */
-  breakShield() {
-    if (this.shield && this.scene) {
-      if (this.scene.sound) {
-        this.scene.sound.play("enemy-die", { volume: 0.5, pitch: 0.8 });
-      }
-
-      const breakingShield = this.shield;
-      this.shield = null;
-      this.hasShield = false;
-      this.shieldHitsRemaining = 0;
-
-      this.scene.tweens.add({
-        targets: breakingShield,
-        scale: breakingShield.scale * 1.5,
-        alpha: 0,
-        duration: 300,
-        ease: "Power2.easeOut",
-        onComplete: () => {
-          breakingShield.destroy();
-        }
-      });
-    } else {
       this.destroyShield();
     }
   }
 
   /**
-   * Starts player invincibility and blinking feedback.
+   * Returns current muzzle position in world coordinates for bullet spawning.
+   * @returns {{x: number, y: number}}
+   */
+  getMuzzlePosition() {
+    if (this.visual) {
+      return this.visual.getWorldMuzzlePosition();
+    }
+    return { x: this.sprite.x, y: this.sprite.y };
+  }
+
+  /**
+   * Trigger visual gun recoil impulse.
+   */
+  triggerGunRecoil() {
+    const config = this.characterConfig.recoil;
+    if (this.visual) {
+      this.visual.applyRecoil(config.offset, config.angle);
+    }
+  }
+
+  /**
+   * Start invincibility frames when player takes damage.
    */
   startInvincibility() {
-    this.clearInvincibilityTimers();
-
     this.isInvincible = true;
+    this.lastHitTime = this.scene.time.now;
 
-    let isAlphaLow = false;
-
-    // Start 100ms blink timer using Phaser time events
-    this.blinkTimer = this.scene.time.addEvent({
-      delay: 100,
-      loop: true,
-      callback: () => {
-        isAlphaLow = !isAlphaLow;
-        this.setPlayerAlpha(isAlphaLow ? 0.3 : 1.0);
+    // Create flashing transparency tween
+    this.invincibilityTween = this.scene.tweens.add({
+      targets: this.visual.container,
+      alpha: 0.3,
+      duration: 100,
+      yoyo: true,
+      repeat: Math.floor(this.invincibilityDuration / 200) - 1,
+      onComplete: () => {
+        this.setPlayerAlpha(1.0);
       }
     });
 
-    // Start invincibility duration timer using Phaser delayed call
     this.invincibilityTimer = this.scene.time.delayedCall(this.invincibilityDuration, () => {
-      this.endInvincibility();
+      this.isInvincible = false;
+      this.setPlayerAlpha(1.0);
     });
   }
 
   /**
-   * Ends player invincibility, stops timers, and restores alpha.
-   */
-  endInvincibility() {
-    this.isInvincible = false;
-    this.clearInvincibilityTimers();
-    this.setPlayerAlpha(1.0);
-  }
-
-  /**
-   * Sets the transparency alpha for all visual player attachment sprites.
-   * @param {number} alpha Opacity value between 0 and 1
+   * Helper to set alpha transparency across the visual container.
+   * @param {number} alpha Alpha value
    */
   setPlayerAlpha(alpha) {
-    if (this.sprite) this.sprite.setAlpha(alpha);
-    if (this.head) this.head.setAlpha(alpha);
-    if (this.gun) this.gun.setAlpha(alpha);
-    if (this.shadow) this.shadow.setAlpha(alpha);
-    if (this.flash) this.flash.setAlpha(alpha);
+    if (this.visual?.container) {
+      this.visual.container.setAlpha(alpha);
+    }
   }
 
   /**
-   * Cleans up active Phaser time events to prevent memory/timer leaks.
+   * Helper to clear invincibility timers and reset visual state.
    */
   clearInvincibilityTimers() {
-    if (this.blinkTimer) {
-      this.blinkTimer.remove();
-      this.blinkTimer = null;
+    this.isInvincible = false;
+    if (this.invincibilityTween) {
+      this.invincibilityTween.stop();
+      this.invincibilityTween = null;
     }
     if (this.invincibilityTimer) {
       this.invincibilityTimer.remove();
       this.invincibilityTimer = null;
     }
+    this.setPlayerAlpha(1.0);
   }
 
   /**
-   * Calculates the exact rotated position of the gun muzzle.
-   * This aligns bullet spawning and muzzle flash visuals precisely, with zero lag or offset.
-   * @returns {{x: number, y: number}}
+   * Equips a temporary weapon drop (e.g. shotgun, laser).
+   * @param {string} dropId Drop weapon identifier
    */
-  getMuzzlePosition() {
-    const flipMultiplier = this.sprite.flipX ? -1 : 1;
-    const baseOffsetX = 90 * flipMultiplier;
-    const baseOffsetY = -10;
+  equipTemporaryWeapon(dropId) {
+    const config = WEAPON_DROP_CONFIG[dropId];
+    if (!config) return;
 
-    // Convert gun angle to radians to apply rotation
-    const angleRad = Phaser.Math.DegToRad(this.gun.angle);
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
-
-    // Apply rotation matrix relative to the gun's center position
-    const rx = baseOffsetX * cos - baseOffsetY * sin;
-    const ry = baseOffsetX * sin + baseOffsetY * cos;
-
-    return {
-      x: this.gun.x + rx,
-      y: this.gun.y + ry,
-    };
-  }
-
-  shoot() {
-    if (this.isDead) return;
-    const muzzle = this.getMuzzlePosition();
-
-    // Delegate cooldown check and get spawn parameters
-    const shotInfo = this.weapon.fire(muzzle, this.sprite.flipX);
-    if (!shotInfo) {
-      return;
-    }
-
-    // Check shot count limit for temporary weapons
-    if (this.tempWeaponMaxShots !== null) {
-      this.tempWeaponShotsFired++;
-
-      // Update UI manager shot count
-      if (this.scene && typeof this.scene.updateWeaponPowerupUI === "function") {
-        this.scene.updateWeaponPowerupUI();
-      }
-
-      if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
-        this.scene.time.delayedCall(0, () => {
-          this.revertToDefaultWeapon();
-          this.showFeedbackText("Weapon Expired", "#ff4444");
-        });
-      }
-    }
-
-    // Play gun shoot sound effect
-    this.scene.sound.play("shoot", { volume: 0.4 });
-
-    // Hand off projectile spawning to the scene's ProjectileManager
-    if (this.scene.projectileManager) {
-      const parentVel = this.sprite.body ? { x: this.sprite.body.velocity.x, y: this.sprite.body.velocity.y } : { x: 0, y: 0 };
-      this.scene.projectileManager.spawn(shotInfo, false, parentVel);
-    }
-
-    // Render visual effects and muzzle flash
-    if (this.flash?.active) {
-      this.flash.destroy();
-    }
-
-    const flashConfig = this.characterConfig.muzzleFlash;
-    const flashSprite = this.scene.add.sprite(muzzle.x, muzzle.y, flashConfig.texture);
-    this.flash = flashSprite;
-
-    this.flash.setScale(flashConfig.scale);
-    this.flash.setDepth(this.gun.depth + 1);
-    this.flash.setFlipX(this.sprite.flipX);
-
-    this.flash.play(flashConfig.anim);
-
-    // Apply recoil parameters directly (zero dynamic allocations / tweens)
-    const recoilConfig = this.characterConfig.recoil;
-    this.recoilOffset = recoilConfig.offset;
-    this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;
-
-    // Play gun recoil/reload sound
-    this.scene.sound.play("recoil", { volume: 0.3 });
-
-    flashSprite.once("animationcomplete", () => {
-      flashSprite.destroy();
-      if (this.flash === flashSprite) {
-        this.flash = null;
-      }
-    });
-  }
-
-  /**
-   * Fires a projectile in the exact direction of the target enemy,
-   * setting the target locked references on the bullets.
-   * @param {number} angle trajectory angle in radians
-   * @param {object} targetEnemy the targeted Enemy instance
-   */
-  shootToward(angle, targetEnemy) {
-    if (this.isDead) return;
-    
-    // Rotate/flip player toward target
-    const isTargetLeft = targetEnemy.sprite.x < this.sprite.x;
-    this.sprite.setFlipX(isTargetLeft);
-
-    const muzzle = this.getMuzzlePosition();
-
-    // Delegate cooldown check and get spawn parameters using the exact angle
-    const shotInfo = this.weapon.fire(muzzle, angle, true);
-    if (!shotInfo) {
-      return;
-    }
-
-    // Check shot count limit for temporary weapons
-    if (this.tempWeaponMaxShots !== null) {
-      this.tempWeaponShotsFired++;
-
-      if (this.scene && typeof this.scene.updateWeaponPowerupUI === "function") {
-        this.scene.updateWeaponPowerupUI();
-      }
-
-      if (this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
-        this.scene.time.delayedCall(0, () => {
-          this.revertToDefaultWeapon();
-          this.showFeedbackText("Weapon Expired", "#ff4444");
-        });
-      }
-    }
-
-    // Play gun shoot sound effect
-    this.scene.sound.play("shoot", { volume: 0.4 });
-
-    // Hand off projectile spawning to the scene's ProjectileManager
-    if (this.scene.projectileManager) {
-      const parentVel = this.sprite.body ? { x: this.sprite.body.velocity.x, y: this.sprite.body.velocity.y } : { x: 0, y: 0 };
-      
-      // Inject target enemy and letter index into shotInfo details
-      if (Array.isArray(shotInfo)) {
-        shotInfo.forEach(shot => {
-          shot.targetEnemy = targetEnemy;
-          shot.targetLetterIndex = targetEnemy.currentLetterIndex;
-        });
-      } else if (shotInfo) {
-        shotInfo.targetEnemy = targetEnemy;
-        shotInfo.targetLetterIndex = targetEnemy.currentLetterIndex;
-      }
-      this.scene.projectileManager.spawn(shotInfo, false, parentVel);
-    }
-
-    // Render visual effects and muzzle flash
-    if (this.flash?.active) {
-      this.flash.destroy();
-    }
-
-    const flashConfig = this.characterConfig.muzzleFlash;
-    const flashSprite = this.scene.add.sprite(muzzle.x, muzzle.y, flashConfig.texture);
-    this.flash = flashSprite;
-
-    this.flash.setScale(flashConfig.scale);
-    this.flash.setDepth(this.gun.depth + 1);
-    this.flash.setFlipX(this.sprite.flipX);
-    this.flash.play(flashConfig.anim);
-
-    // Apply recoil parameters directly
-    const recoilConfig = this.characterConfig.recoil;
-    this.recoilOffset = recoilConfig.offset;
-    this.recoilAngle = this.sprite.flipX ? recoilConfig.angle : -recoilConfig.angle;
-
-    // Play gun recoil/reload sound
-    this.scene.sound.play("recoil", { volume: 0.3 });
-
-    flashSprite.once("animationcomplete", () => {
-      flashSprite.destroy();
-      if (this.flash === flashSprite) {
-        this.flash = null;
-      }
-    });
-  }
-
-  /**
-   * Equips a temporary weapon.
-   * @param {string} gunId The weapon ID to equip (e.g. 'gun1')
-   */
-  equipTemporaryWeapon(gunId) {
-    // Clear any existing expiration timers
-    if (this.tempWeaponTimer) {
-      this.tempWeaponTimer.remove();
-      this.tempWeaponTimer = null;
-    }
-
-    this.tempWeaponId = gunId;
+    this.tempWeaponId = dropId;
+    this.tempWeaponMaxShots = config.durationShots || null;
     this.tempWeaponShotsFired = 0;
 
-    // Configure limits based on weapon drop config
-    const maxShotsConfig = WEAPON_DROP_CONFIG.maxShots[gunId];
-    this.tempWeaponMaxShots = maxShotsConfig !== undefined ? maxShotsConfig : null;
-
-    const duration = WEAPON_DROP_CONFIG.durations[gunId];
-    if (duration) {
-      this.tempWeaponTimer = this.scene.time.delayedCall(
-        duration,
-        () => {
-          this.revertToDefaultWeapon();
-          this.showFeedbackText("Weapon Expired", "#ff4444");
-        },
-        [],
-        this
-      );
+    // Update gun sprite texture
+    if (config.gunTexture) {
+      this.setGun(config.gunTexture);
     }
 
-    // Set the equipped skin image key (preloaded as skin_gunId)
-    this.gun.setTexture(`skin_${gunId}`);
-
-    // Re-create the Weapon instance using the temporary config key
-    this.weapon = new Weapon(this.scene, this, gunId);
-
-    // Visual feedback text above player
-    const formattedName = gunId.toUpperCase();
-    this.showFeedbackText(formattedName, "#44ff44");
-
-    // Optional audio hook (power-up pickup sound)
-    this.scene.sound.play("power-up", { volume: 0.5 });
-
-    // Call UI manager to display the power-up slot icon
-    if (this.scene && typeof this.scene.showWeaponPowerup === "function") {
-      if (duration) {
-        this.scene.showWeaponPowerup({
-          iconKey: `drop_${gunId}`,
-          duration: duration / 1000,
-          type: "time"
-        });
-      } else if (this.tempWeaponMaxShots !== null) {
-        this.scene.showWeaponPowerup({
-          iconKey: `drop_${gunId}`,
-          duration: this.tempWeaponMaxShots,
-          type: "shots"
-        });
+    // Set duration timer if applicable
+    if (config.durationTime) {
+      if (this.tempWeaponTimer) {
+        this.tempWeaponTimer.remove();
       }
+      this.tempWeaponTimer = this.scene.time.delayedCall(config.durationTime, () => {
+        this.revertToDefaultWeapon();
+      });
+    }
+
+    // Notify scene to update weapon drop UI
+    this.scene?.updateWeaponPowerupUI?.();
+  }
+
+  /**
+   * Consumes a shot from the temporary weapon.
+   */
+  useTemporaryWeaponShot() {
+    if (!this.tempWeaponId) return;
+
+    this.tempWeaponShotsFired++;
+    if (this.tempWeaponMaxShots && this.tempWeaponShotsFired >= this.tempWeaponMaxShots) {
+      this.revertToDefaultWeapon();
+    } else {
+      this.scene?.updateWeaponPowerupUI?.();
     }
   }
 
   /**
-   * Reverts the temporary weapon back to the player's default weapon.
+   * Reverts to the player's default character weapon.
    */
   revertToDefaultWeapon() {
-    if (this.tempWeaponTimer) {
-      this.tempWeaponTimer.remove();
-      this.tempWeaponTimer = null;
-    }
-
     this.tempWeaponId = null;
     this.tempWeaponMaxShots = null;
     this.tempWeaponShotsFired = 0;
-
-    // Restore default skin and weapon configuration
-    this.gun.setTexture(this.characterConfig.gunTexture);
-    this.weapon = new Weapon(this.scene, this, this.characterConfig.weapon);
-
-    // Clear UI manager icon
-    if (this.scene && typeof this.scene.clearWeaponPowerup === "function") {
-      this.scene.clearWeaponPowerup();
+    if (this.tempWeaponTimer) {
+      this.tempWeaponTimer.remove();
+      this.tempWeaponTimer = null;
     }
+
+    // Revert gun texture to character default
+    this.setGun(this.characterConfig.gunTexture);
+    this.scene?.clearWeaponPowerup?.();
   }
 
   /**
-   * Spawns a floating feedback text above the player.
-   * @param {string} text The text to display
-   * @param {string} color The hex color code
+   * Returns current active weapon drop configuration or default weapon config.
    */
-  showFeedbackText(text, color = "#ffffff") {
-    const feedback = this.scene.add.text(
-      this.sprite.x,
-      this.sprite.y - 80,
-      text,
-      {
-        fontSize: "20px",
-        fontFamily: "Arial",
-        color: color,
-        stroke: "#000000",
-        strokeThickness: 4,
-        align: "center"
-      }
-    );
-    feedback.setOrigin(0.5);
-    feedback.setDepth(this.sprite.depth + 10);
-
-    this.scene.tweens.add({
-      targets: feedback,
-      y: feedback.y - 40,
-      alpha: 0,
-      duration: 1200,
-      onComplete: () => {
-        feedback.destroy();
-      }
-    });
+  getEquippedWeaponConfig() {
+    if (this.tempWeaponId && WEAPON_DROP_CONFIG[this.tempWeaponId]) {
+      return WEAPON_DROP_CONFIG[this.tempWeaponId];
+    }
+    return this.weapon.config;
   }
 }
