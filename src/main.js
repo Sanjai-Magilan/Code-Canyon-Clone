@@ -24,7 +24,7 @@ const config = {
   scene: [MainMenuScene, CharacterSelectScene, GameScene],
 };
 
-new Phaser.Game(config);
+window.game = new Phaser.Game(config);
 
 window.addEventListener("error", (e) => {
   console.error("GLOBAL ERROR:", e.error);

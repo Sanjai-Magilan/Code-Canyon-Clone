@@ -26,11 +26,11 @@ export default class ProjectileManager {
 
     // Recycle bullets when they collide with obstacles (static stones)
     scene.physics.add.collider(this.bullets, scene.stones, (bullet) => {
-      bullet.deactivate();
+      bullet.deactivate("stone collision");
     });
 
     scene.physics.add.collider(this.enemyBullets, scene.stones, (bullet) => {
-      bullet.deactivate();
+      bullet.deactivate("enemy bullet stone collision");
     });
 
     // Check for overlaps between bullets and the enemies physics group
@@ -70,21 +70,20 @@ export default class ProjectileManager {
 
   /**
    * Spawns/recycles a single projectile.
-   * @param {object} info Shot info containing x, y, angle, bulletTexture, bulletSpeed, and bulletScale
+   * @param {object} info Shot info containing x, y, angle, bulletTexture, bulletSpeed, bulletScale, bulletLifetime, bulletDamage, and targetEnemy
    * @param {boolean} isEnemy True if spawned by an enemy unit
    * @param {object|null} parentVelocity Velocity vector of the parent entity
-   * @private
    */
-  spawnSingle(info, isEnemy, parentVelocity) {
+  spawnSingle(info, isEnemy = false, parentVelocity = null) {
     const group = isEnemy ? this.enemyBullets : this.bullets;
-    // Set the texture dynamically when getting the bullet from the pool
     const bullet = group.get(info.x, info.y, info.bulletTexture);
+
     if (bullet) {
       if (info.bulletTexture) {
         bullet.setTexture(info.bulletTexture);
       }
       
-      // Inject typing targets onto the bullet instance
+      // Inject target enemy reference onto the bullet instance for homing & collision filtering
       bullet.targetEnemy = info.targetEnemy || null;
       bullet.targetLetterIndex = info.targetLetterIndex !== undefined ? info.targetLetterIndex : null;
 
@@ -92,12 +91,12 @@ export default class ProjectileManager {
         x: info.x,
         y: info.y,
         angle: info.angle,
-        speed: info.bulletSpeed,
-        scale: info.bulletScale,
-        lifetime: info.bulletLifetime,
+        speed: info.bulletSpeed || 1400,
+        scale: info.bulletScale || 0.6,
+        lifetime: info.bulletLifetime || 2000,
         parentVelocity,
-        inheritanceFactor: info.velocityInheritanceFactor,
-        damage: info.bulletDamage
+        inheritanceFactor: info.velocityInheritanceFactor || 0,
+        damage: info.bulletDamage !== undefined ? info.bulletDamage : 1
       });
     }
   }
@@ -108,7 +107,6 @@ export default class ProjectileManager {
    * @param {any} arg2 Second physics object in overlap
    */
   handleBulletPlayerCollision(arg1, arg2) {
-    // Determine which argument is the bullet by checking for the deactivate method
     let bullet = null;
     if (arg1 && typeof arg1.deactivate === "function") {
       bullet = arg1;
@@ -117,9 +115,8 @@ export default class ProjectileManager {
     }
 
     if (bullet) {
-      bullet.deactivate(); // Recycle bullet to pool
+      bullet.deactivate("player collision");
     } else {
-      // Fallback: deactivate whichever is not the player sprite
       const playerSprite = this.scene.player?.getSprite() || null;
       if (arg1 && arg1 !== playerSprite && typeof arg1.disableBody === "function") {
         arg1.disableBody(true, true);
@@ -128,8 +125,7 @@ export default class ProjectileManager {
       }
     }
 
-    // Deal damage to the Player wrapper in the scene
-    this.scene.player?.takeDamage(10, bullet); // Standard damage value
+    this.scene.player?.takeDamage(10, bullet);
   }
 
   /**
@@ -139,87 +135,32 @@ export default class ProjectileManager {
    */
   handleBulletEnemyCollision(bullet, enemySprite) {
     if (!enemySprite || !enemySprite.active) {
-      bullet.deactivate();
+      bullet.deactivate("inactive enemy sprite");
       return;
     }
 
-    // Find the corresponding Enemy class wrapper
     const scene = this.scene;
     const index = scene.enemies.findIndex((e) => e.sprite === enemySprite);
     if (index === -1) {
-      bullet.deactivate();
+      bullet.deactivate("enemy not found in scene list");
       return;
     }
 
     const enemy = scene.enemies[index];
 
-    // If this is a typed bullet, it MUST ONLY hit its specific target enemy
+    // If bullet has a target enemy specified, pass through all non-target enemies
     if (bullet.targetEnemy && bullet.targetEnemy !== enemy) {
-      // Bullet ignores this enemy and passes through
       return;
     }
 
-    // Extract target locked details before recycling the bullet
-    const targetEnemy = bullet.targetEnemy;
-    const isFinalTypingShot = bullet.isFinalTypingShot;
-    const damage = bullet.damage !== undefined ? bullet.damage : 50;
-    const isExplosive = bullet.texture?.key === "bullet_gun5";
-
     // Deactivate/recycle bullet to the pool
-    bullet.deactivate();
+    bullet.deactivate("enemy collision");
 
-    // Log the complete bullet and target state trace
-    if (targetEnemy) {
-      const existsInEnemies = scene.enemies.includes(targetEnemy);
-      const existsInGroup = scene.enemiesGroup && scene.enemiesGroup.contains(targetEnemy.sprite);
-      console.log(`[Typing Pipeline Log] Collision Fired:`, {
-        enemyId: targetEnemy.id,
-        enemyType: targetEnemy.sprite?.texture?.key || "unknown",
-        assignedWord: targetEnemy.assignedWord,
-        currentLetterIndex: targetEnemy.currentLetterIndex,
-        targetLetterIndex: bullet.targetLetterIndex,
-        isFinalTypingShot: isFinalTypingShot,
-        health: targetEnemy.health,
-        isDead: targetEnemy.isDead,
-        spriteActive: targetEnemy.sprite?.active || false,
-        wrapperExists: !!targetEnemy,
-        existsInEnemies,
-        existsInGroup,
-        collisionFired: true,
-        dieCalled: false
-      });
+    // Delegate 1-damage hit handling, red flash, particles, knockback, and letter progress to the enemy
+    if (typeof enemy.onBulletHit === "function") {
+      enemy.onBulletHit(bullet);
+    } else if (typeof enemy.applyDamage === "function") {
+      enemy.applyDamage(1, DAMAGE_SOURCE.BULLET);
     }
-
-    // Handle explosive bullet logic
-    if (isExplosive) {
-      this.triggerExplosionDamage(enemySprite.x, enemySprite.y, damage, targetEnemy);
-      // Only return early if this is a normal untargeted explosive bullet.
-      // If it is a targeted completion bullet, let it continue through to the typing system so the enemy is killed!
-      if (!targetEnemy) {
-        return;
-      }
-    }
-
-    // Delegate typing hit handling entirely to the target enemy
-    if (targetEnemy) {
-      if (typeof enemy.handleTypingBulletHit === "function") {
-        enemy.handleTypingBulletHit(isFinalTypingShot);
-      }
-    } else {
-      // Fallback for any non-typed damage (if any exist)
-      if (typeof enemy.applyDamage === "function") {
-        enemy.applyDamage(damage, DAMAGE_SOURCE.BULLET);
-      } else {
-        enemy.health -= damage;
-        if (enemy.health <= 0) {
-          enemy.die(DAMAGE_SOURCE.BULLET);
-        }
-      }
-    }
-  }
-
-  triggerExplosionDamage(x, y, damage, targetEnemy = null) {
-    // Centralized death effects are now handled exclusively inside the enemy's die() flow,
-    // which prevents duplicate explosions, duplicate camera shakes, and typing progress desyncs.
   }
 }

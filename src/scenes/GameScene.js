@@ -1360,32 +1360,37 @@ export default class GameScene extends Phaser.Scene {
     const char = event.key.toLowerCase();
     if (char.length !== 1 || char < "a" || char > "z") return;
 
-    console.log(`[Typing Pipeline] Key Pressed: "${char}"`);
-
+    // Reset target lock if existing target is inactive, dead, or fully typed
     if (this.typingTarget) {
-      if (!this.typingTarget.sprite || !this.typingTarget.sprite.active || this.typingTarget.isDead) {
-        console.log(`[Typing Pipeline] Existing target ${this.typingTarget.id} is dead/inactive. Resetting lock.`);
+      if (
+        !this.typingTarget.sprite ||
+        !this.typingTarget.sprite.active ||
+        this.typingTarget.isDead ||
+        (this.typingTarget.pendingTypedCount !== undefined &&
+          this.typingTarget.pendingTypedCount >= this.typingTarget.assignedWord.length)
+      ) {
         this.typingTarget = null;
       }
     }
 
     if (!this.typingTarget) {
-      console.log(`[Typing Pipeline] Selecting new target for character "${char}"`);
       // Find visible active enemies whose next required letter matches char
       const view = this.cameras.main.worldView;
-      const candidates = this.enemies.filter(enemy => {
+      const candidates = this.enemies.filter((enemy) => {
         if (!enemy || !enemy.sprite || !enemy.sprite.active || enemy.isDead) return false;
-        
+
         const isVisible = view.contains(enemy.sprite.x, enemy.sprite.y);
         if (!isVisible) return false;
 
-        const nextChar = enemy.assignedWord[enemy.currentLetterIndex].toLowerCase();
+        const nextIdx = enemy.pendingTypedCount !== undefined ? enemy.pendingTypedCount : 0;
+        if (nextIdx >= enemy.assignedWord.length) return false;
+
+        const nextChar = enemy.assignedWord[nextIdx].toLowerCase();
         return nextChar === char;
       });
 
       if (candidates.length === 0) {
-        console.log(`[Typing Pipeline] No candidates found for character "${char}"`);
-        return;
+        return; // Incorrect typing (no candidate matching keypress)
       }
 
       // Lock onto the closest candidate to the player
@@ -1411,15 +1416,26 @@ export default class GameScene extends Phaser.Scene {
       }
 
       this.typingTarget = closestEnemy;
-      console.log(`[Typing Pipeline] Locked target to ${this.typingTarget.id} (${this.typingTarget.assignedWord})`);
     }
 
-    const nextChar = this.typingTarget.assignedWord[this.typingTarget.currentLetterIndex].toLowerCase();
-    if (char === nextChar) {
-      console.log(`[Typing Pipeline] Character matches! Advancing progress on target ${this.typingTarget.id}`);
-      this.typingTarget.advanceProgress();
-    } else {
-      console.log(`[Typing Pipeline] Character "${char}" does not match next character "${nextChar}" for target ${this.typingTarget.id}`);
+    // Check if key matches next required character for locked target
+    const target = this.typingTarget;
+    const currentIdx = target.pendingTypedCount !== undefined ? target.pendingTypedCount : 0;
+
+    if (currentIdx < target.assignedWord.length) {
+      const requiredChar = target.assignedWord[currentIdx].toLowerCase();
+      if (char === requiredChar) {
+        // 1. Fire bullet (captures currentIdx before pendingTypedCount is incremented)
+        this.player.shootToward(target);
+
+        // 2. Increment pendingTypedCount after firing bullet
+        target.pendingTypedCount = currentIdx + 1;
+
+        // 3. Release target lock immediately if all letters have been typed
+        if (target.pendingTypedCount >= target.assignedWord.length) {
+          this.typingTarget = null;
+        }
+      }
     }
   }
 

@@ -51,15 +51,19 @@ export default class Enemy {
       this.sprite.play(animKey);
     }
 
-    // Set health to 1 so all enemies die in one bullet hit
-    this.maxHealth = 1;
+    // --- Typing Combat & Health System State ---
+    this.assignedWord = scene.getUniqueWordForEnemy(texture);
+    
+    // Enemy HP equals the exact number of characters in its assigned word
+    this.maxHealth = this.assignedWord.length;
     this.health = this.maxHealth;
     this.isDead = false;
 
-    // --- Typing Combat System State ---
-    this.assignedWord = scene.getUniqueWordForEnemy(texture);
+    // Word progress trackers:
+    // currentLetterIndex: Number of landed bullet hits (drives green letter UI)
+    // pendingTypedCount: Number of correct keypresses / fired bullets
     this.currentLetterIndex = 0;
-    this.virtualLetterIndex = 0;
+    this.pendingTypedCount = 0;
     this.typedProgress = "";
     this.remainingLetters = this.assignedWord;
 
@@ -122,33 +126,97 @@ export default class Enemy {
     return null;
   }
 
+  /**
+   * Called when a bullet impacts this enemy.
+   * Non-final bullets advance letter progress, flash red, and play hit effects.
+   * The final bullet impact immediately invokes die() to trigger existing explosion & drops.
+   * @param {object} bullet The bullet instance impacting this enemy
+   */
+  onBulletHit(bullet = null) {
+    if (this.isDead) return;
+
+    const isFinal = bullet?.isFinalTypingShot || (this.currentLetterIndex >= this.assignedWord.length - 1);
+
+    console.log("[STEP 2 LOG] Enemy.onBulletHit BEFORE hit:", {
+      enemyId: this.id,
+      assignedWord: this.assignedWord,
+      currentLetterIndex: this.currentLetterIndex,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      isFinal: isFinal,
+      bulletTargetEnemy: bullet?.targetEnemy?.id,
+      bulletTargetLetterIndex: bullet?.targetLetterIndex
+    });
+
+    if (isFinal) {
+      // Final bullet hit: Immediately trigger existing die() method
+      this.die(DAMAGE_SOURCE.TYPING);
+    } else {
+      // Non-final bullet hit: Advance letter progress, flash red, play hit effect
+      this.currentLetterIndex++;
+      this.typedProgress = this.assignedWord.slice(0, this.currentLetterIndex);
+      this.remainingLetters = this.assignedWord.slice(this.currentLetterIndex);
+
+      // Update letter sprite tints: GREEN for landed hits, WHITE for remaining
+      for (let i = 0; i < this.wordSprites.length; i++) {
+        const sprite = this.wordSprites[i];
+        if (sprite?.active) {
+          if (i < this.currentLetterIndex) {
+            sprite.setTint(0x00ff00);
+          } else {
+            sprite.setTint(0xffffff);
+          }
+        }
+      }
+
+      // Flash enemy red briefly for non-final hit feedback
+      if (this.sprite?.active) {
+        this.sprite.setTint(0xff4444);
+        this.scene?.time?.delayedCall(90, () => {
+          if (this.sprite?.active && !this.isDead) {
+            this.sprite.clearTint();
+          }
+        });
+      }
+
+      // Play hit spark effect & sound
+      if (this.scene && this.sprite?.active) {
+        if (typeof this.scene.spawnBulletHitEffect === "function") {
+          this.scene.spawnBulletHitEffect(this.sprite.x, this.sprite.y);
+        }
+      }
+    }
+
+    console.log("[STEP 2 LOG] Enemy.onBulletHit AFTER hit:", {
+      enemyId: this.id,
+      currentLetterIndex: this.currentLetterIndex,
+      health: this.health,
+      isDead: this.isDead
+    });
+  }
+
+  /**
+   * Applies damage to enemy.
+   * @param {number} amount Damage quantity
+   * @param {string} source Source identifier
+   */
   applyDamage(amount, source = DAMAGE_SOURCE.BULLET) {
     if (this.isDead) return;
-    this.health -= amount;
-    console.log(`[Damage System] ${this.id} took ${amount} damage from ${source}. Remaining HP: ${this.health}`);
+    this.health = Math.max(0, this.health - amount);
     if (this.health <= 0) {
       this.die(source);
     }
   }
 
   /**
-   * Restores health to the enemy.
-   * @param {number} amount Health quantity to restore
-   */
-  heal(amount) {
-    if (this.isDead) return;
-    this.health = Math.min(this.health + amount, this.maxHealth);
-  }
-
-  /**
-   * Handles enemy death, including lists splicing, explosions, and pickups.
-   * @param {string} source Source type of the death
+   * Handles enemy death sequence (Explosion, pickups, score, and removal).
+   * @param {string} source Source type of death
    */
   die(source = DAMAGE_SOURCE.UNKNOWN) {
-    console.log(`[Typing Pipeline] die() called for ${this.id} from source: ${source}`);
     if (this.isDead) return;
     this.isDead = true;
 
+    console.log(`[Typing Combat] die() triggered for ${this.id} (${this.assignedWord})`);
     const scene = this.scene;
 
     // Call scene onEnemyKilled hook to register kill streak progress
@@ -160,16 +228,18 @@ export default class Enemy {
       const deathX = this.sprite.x;
       const deathY = this.sprite.y;
 
+      // Death animation & explosion particles
       if (typeof scene.spawnEnemyExplosion === "function") {
         scene.spawnEnemyExplosion(deathX, deathY, this.sprite.texture.key);
       }
 
+      // Drop weapons
       const gunId = this.dropGunId();
       if (gunId && scene.weaponDropManager) {
         scene.weaponDropManager.spawnPickup(deathX, deathY, gunId);
       }
 
-      // Only the Worm enemy can drop hearts (with 5% probability)
+      // Worm enemy heart drops (5%)
       if (this.sprite.texture.key === "worm") {
         if (Phaser.Math.Between(1, 100) <= 5) {
           if (typeof scene.spawnHealthPickup === "function") {
@@ -178,7 +248,7 @@ export default class Enemy {
         }
       }
 
-      // Only the Crab enemy can drop shields (with 10% probability)
+      // Crab enemy shield drops (10%)
       if (this.sprite.texture.key === "crab") {
         if (Phaser.Math.Between(1, 100) <= 10) {
           if (typeof scene.spawnShieldPickup === "function") {
@@ -187,7 +257,7 @@ export default class Enemy {
         }
       }
 
-      // Only the Angler enemy can drop shields (with 15% probability)
+      // Angler enemy shield drops (15%)
       if (this.sprite.texture.key === "angler") {
         if (Phaser.Math.Between(1, 100) <= 15) {
           if (typeof scene.spawnShieldPickup === "function") {
@@ -248,51 +318,6 @@ export default class Enemy {
     }
   }
 
-  handleTypingBulletHit(isFinalTypingShot) {
-    console.log(`[Typing Pipeline] handleTypingBulletHit on ${this.id}: isDead=${this.isDead}`);
-    if (this.isDead) return;
-
-    this.applyDamage(this.maxHealth, DAMAGE_SOURCE.TYPING);
-  }
-
-  /**
-   * Advances the actual hit progress when a typed bullet hits.
-   */
-  advanceProgress() {
-    if (this.isDead) return;
-
-    this.currentLetterIndex++;
-    this.typedProgress = this.assignedWord.slice(0, this.currentLetterIndex);
-    this.remainingLetters = this.assignedWord.slice(this.currentLetterIndex);
-
-    console.log(`[Typing Pipeline] advanceProgress on ${this.id}: typed="${this.typedProgress}" remaining="${this.remainingLetters}" (length=${this.assignedWord.length})`);
-
-    // Apply green tint to successfully typed/hit characters, clear tint for untyped
-    for (let i = 0; i < this.wordSprites.length; i++) {
-      const sprite = this.wordSprites[i];
-      if (sprite?.active) {
-        if (i < this.currentLetterIndex) {
-          sprite.setTint(0x00ff00);
-        } else {
-          sprite.setTint(0xffffff);
-        }
-      }
-    }
-
-    // Trigger completion bullet once the whole word is successfully typed
-    if (this.currentLetterIndex >= this.assignedWord.length) {
-      console.log(`[Typing Pipeline] Word fully typed for ${this.id}. Triggering fireCompletionBullet.`);
-      if (this.scene && typeof this.scene.fireCompletionBullet === "function") {
-        this.scene.fireCompletionBullet(this);
-      }
-      
-      // Clear target lock immediately upon completion
-      if (this.scene?.typingTarget === this) {
-        this.scene.typingTarget = null;
-      }
-    }
-  }
-
   destroy(fromSpriteEvent = false) {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
@@ -319,25 +344,22 @@ export default class Enemy {
       }
       this.shadow = null;
     }
+
+    // Destroy word label sprites
     if (this.wordSprites) {
-      this.wordSprites.forEach(sprite => {
-        if (sprite && !sceneShutdown) sprite.destroy();
+      this.wordSprites.forEach((sprite) => {
+        if (!sceneShutdown && sprite?.active) {
+          sprite.destroy();
+        }
       });
       this.wordSprites = [];
     }
-    if (this.assignedWord) {
-      scene?.activeWords?.delete(this.assignedWord);
-    }
+
     if (this.sprite) {
-      this.sprite.off(Phaser.GameObjects.Events.DESTROY);
-      if (scene && scene.enemiesGroup) {
-        scene.enemiesGroup.remove(this.sprite);
+      if (!fromSpriteEvent && !sceneShutdown && this.sprite.active) {
+        this.sprite.destroy();
       }
-      const sprite = this.sprite;
       this.sprite = null;
-      if (!fromSpriteEvent && !sceneShutdown) {
-        sprite.destroy();
-      }
     }
   }
 }

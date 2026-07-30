@@ -508,6 +508,57 @@ export default class Player {
   }
 
   /**
+   * Fires one bullet toward a targeted enemy.
+   * @param {object} targetEnemy The targeted Enemy entity
+   */
+  shootToward(targetEnemy) {
+    if (!targetEnemy || !targetEnemy.sprite || !targetEnemy.sprite.active || targetEnemy.isDead) return;
+
+    const muzzle = this.getMuzzlePosition();
+    const angle = Phaser.Math.Angle.Between(
+      muzzle.x,
+      muzzle.y,
+      targetEnemy.sprite.x,
+      targetEnemy.sprite.y
+    );
+
+    // Get active weapon config
+    const weaponConfig = this.getEquippedWeaponConfig();
+    const bulletTexture = weaponConfig.bulletTexture || "bullet";
+    const bulletSpeed = weaponConfig.bulletSpeed || 1400;
+    const bulletScale = weaponConfig.bulletScale || 0.6;
+    const bulletLifetime = weaponConfig.projectileLifetime || 2000;
+
+    // Trigger visual gun recoil impulse
+    this.triggerGunRecoil();
+
+    // Play shoot sound effect if loaded in audio cache
+    if (this.scene?.sound && this.scene?.cache?.audio?.has("shoot")) {
+      this.scene.sound.play("shoot", { volume: 0.25 });
+    }
+
+    // Spawn bullet via ProjectileManager with target tracking & targetLetterIndex
+    if (this.scene?.projectileManager) {
+      const nextIdx = targetEnemy.pendingTypedCount !== undefined ? targetEnemy.pendingTypedCount : 0;
+      this.scene.projectileManager.spawnSingle({
+        x: muzzle.x,
+        y: muzzle.y,
+        angle: angle,
+        bulletTexture: bulletTexture,
+        bulletSpeed: bulletSpeed,
+        bulletScale: bulletScale,
+        bulletLifetime: bulletLifetime,
+        bulletDamage: 1,
+        targetEnemy: targetEnemy,
+        targetLetterIndex: nextIdx
+      }, false, this.sprite?.body?.velocity || null);
+    }
+
+    // Consume shot from temporary weapon drop if equipped
+    this.useTemporaryWeaponShot();
+  }
+
+  /**
    * Trigger visual gun recoil impulse.
    */
   triggerGunRecoil() {

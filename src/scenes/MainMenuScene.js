@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import introImg from "../assets/Sprites/intro image/introImage.png";
+import introImg from "../assets/Sprites/intro image/introImage.webp";
 import powerUpAudio from "../assets/Sounds/powerUp.webm";
 
 export default class MainMenuScene extends Phaser.Scene {

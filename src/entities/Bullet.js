@@ -19,10 +19,14 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
    * @param {number|null} lifetime Projectile lifetime in ms
    * @param {object|null} parentVelocity Owner velocity to inherit
    * @param {number} inheritanceFactor Proportion of owner velocity to inherit (0.0 to 1.0)
+   * @param {number} damage Damage value of bullet
    */
-  fire({ x, y, angle, speed = this.speed, scale = null, lifetime = null, parentVelocity = null, inheritanceFactor = 0, damage = 50 }) {
+  fire({ x, y, angle, speed = this.speed, scale = null, lifetime = null, parentVelocity = null, inheritanceFactor = 0, damage = 1 }) {
     this.damage = damage;
-    // Re-enable the physics body and make the bullet active and visible
+    this.speed = speed;
+    
+    // Explicitly set GameObject transform position to sync with physics body reset
+    this.setPosition(x, y);
     this.enableBody(true, x, y, true, true);
     
     if (scale !== null) {
@@ -62,14 +66,15 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
     }
     return (
       this.targetLetterIndex !== null &&
-      this.targetLetterIndex >= this.targetEnemy.assignedWord.length
+      this.targetLetterIndex >= this.targetEnemy.assignedWord.length - 1
     );
   }
 
   /**
    * Deactivates the bullet, returning it to the pool.
+   * @param {string} reason Reason for deactivation
    */
-  deactivate() {
+  deactivate(reason = "manual destroy") {
     this.disableBody(true, true);
     this.targetEnemy = null;
     this.targetLetterIndex = null;
@@ -78,9 +83,17 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
   update() {
     if (!this.active || !this.body) return;
 
+    // Continuous homing tracking toward target enemy so bullets never miss
+    if (this.targetEnemy && this.targetEnemy.sprite && this.targetEnemy.sprite.active && !this.targetEnemy.isDead) {
+      const targetSprite = this.targetEnemy.sprite;
+      const angle = Phaser.Math.Angle.Between(this.x, this.y, targetSprite.x, targetSprite.y);
+      this.setVelocity(Math.cos(angle) * this.speed, Math.sin(angle) * this.speed);
+      this.setRotation(angle);
+    }
+
     // Check if bullet exceeded its configured lifetime limits
     if (this.lifetime && this.scene.time.now - this.timeFired >= this.lifetime) {
-      this.deactivate();
+      this.deactivate("lifetime limit reached");
       return;
     }
 
@@ -92,7 +105,7 @@ export default class Bullet extends Phaser.Physics.Arcade.Image {
       this.y < bounds.y ||
       this.y > bounds.bottom
     ) {
-      this.deactivate();
+      this.deactivate("out of bounds");
     }
   }
 }
