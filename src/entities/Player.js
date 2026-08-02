@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import Weapon from "./Weapon";
 import CHARACTERS from "../config/characterConfig";
+import WEAPON_CONFIG from "../config/weaponConfig";
 import WEAPON_DROP_CONFIG from "../config/weaponDropConfig";
 import PLAYER_CONFIG from "../config/playerConfig";
 import PlayerDustEmitter from "../systems/PlayerDustEmitter";
@@ -159,16 +160,28 @@ export default class Player {
       this.lastMoveDirection.copy(this.currentDirVector).normalize();
     }
 
+    // Check if player is actively engaging a typing target
+    const hasTypingTarget = !!(
+      this.scene?.typingTarget &&
+      this.scene.typingTarget.sprite &&
+      this.scene.typingTarget.sprite.active &&
+      !this.scene.typingTarget.isDead
+    );
+
     // Handle horizontal movement & flip state
     if (leftDown) {
       this.sprite.setVelocityX(-this.speed);
       this.sprite.setFlipX(true);
-      this.visual.setFlip(true);
+      if (!hasTypingTarget) {
+        this.visual.setFlip(true);
+      }
       isMoving = true;
     } else if (rightDown) {
       this.sprite.setVelocityX(this.speed);
       this.sprite.setFlipX(false);
-      this.visual.setFlip(false);
+      if (!hasTypingTarget) {
+        this.visual.setFlip(false);
+      }
       isMoving = true;
     }
 
@@ -514,6 +527,12 @@ export default class Player {
   shootToward(targetEnemy) {
     if (!targetEnemy || !targetEnemy.sprite || !targetEnemy.sprite.active || targetEnemy.isDead) return;
 
+    // Determine horizontal facing direction toward target enemy (facing left if enemy X < player X)
+    const isTargetLeft = targetEnemy.sprite.x < this.sprite.x;
+    if (this.visual) {
+      this.visual.setFlip(isTargetLeft);
+    }
+
     const muzzle = this.getMuzzlePosition();
     const angle = Phaser.Math.Angle.Between(
       muzzle.x,
@@ -624,24 +643,24 @@ export default class Player {
    * @param {string} dropId Drop weapon identifier
    */
   equipTemporaryWeapon(dropId) {
-    const config = WEAPON_DROP_CONFIG[dropId];
+    const config = WEAPON_CONFIG[dropId];
     if (!config) return;
 
     this.tempWeaponId = dropId;
-    this.tempWeaponMaxShots = config.durationShots || null;
+    this.tempWeaponMaxShots = WEAPON_DROP_CONFIG.maxShots?.[dropId] || config.durationShots || null;
     this.tempWeaponShotsFired = 0;
 
-    // Update gun sprite texture
-    if (config.gunTexture) {
-      this.setGun(config.gunTexture);
-    }
+    // Update gun sprite texture (uses skin_<dropId> texture key if gunTexture is not explicitly defined)
+    const gunTexture = config.gunTexture || `skin_${dropId}`;
+    this.setGun(gunTexture);
 
-    // Set duration timer if applicable
-    if (config.durationTime) {
+    // Set duration timer if applicable from WEAPON_DROP_CONFIG.durations
+    const durationMs = WEAPON_DROP_CONFIG.durations?.[dropId] || config.durationTime || null;
+    if (durationMs) {
       if (this.tempWeaponTimer) {
         this.tempWeaponTimer.remove();
       }
-      this.tempWeaponTimer = this.scene.time.delayedCall(config.durationTime, () => {
+      this.tempWeaponTimer = this.scene.time.delayedCall(durationMs, () => {
         this.revertToDefaultWeapon();
       });
     }
@@ -685,8 +704,8 @@ export default class Player {
    * Returns current active weapon drop configuration or default weapon config.
    */
   getEquippedWeaponConfig() {
-    if (this.tempWeaponId && WEAPON_DROP_CONFIG[this.tempWeaponId]) {
-      return WEAPON_DROP_CONFIG[this.tempWeaponId];
+    if (this.tempWeaponId && WEAPON_CONFIG[this.tempWeaponId]) {
+      return WEAPON_CONFIG[this.tempWeaponId];
     }
     return this.weapon.config;
   }

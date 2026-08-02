@@ -140,7 +140,7 @@ export default class PlayerVisual {
         (this.gunOffset.x + this.recoilOffset) * flipMultiplier,
         this.gunOffset.y
       );
-      this.gun.setAngle(this.recoilAngle);
+      this.gun.setAngle(this.recoilAngle * flipMultiplier);
     }
 
     // 5. Update flash position if active
