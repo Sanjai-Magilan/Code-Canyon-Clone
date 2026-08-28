@@ -1,3 +1,4 @@
+alert("MAIN.JS LOADED");
 import Phaser from "phaser";
 import MainMenuScene from "./scenes/MainMenuScene";
 import CharacterSelectScene from "./scenes/CharacterSelectScene";
