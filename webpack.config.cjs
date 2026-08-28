@@ -1,13 +1,15 @@
 const path = require("path");
 const webpack = require("webpack");
-// const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
   mode: "production",
 
   entry: {
     "phaser-custom": "./phaser-custom.cjs",
-    // 'phaser-custom.min': './phaser-custom.js',
+  },
+
+  experiments: {
+    outputModule: true,
   },
 
   resolve: {
@@ -21,17 +23,9 @@ module.exports = {
     path: path.resolve(__dirname, "phaser-dist"),
     filename: "[name].js",
     library: {
-      name: "Phaser",
-      type: "umd",
-      export: "default",
+      type: "module",
     },
   },
-
-  //   optimization: {
-  //     minimizer: [
-  //         new TerserPlugin(),
-  //     ],
-  //   },
 
   plugins: [
     new webpack.DefinePlugin({
