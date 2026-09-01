@@ -665,8 +665,16 @@ export default class Player {
       });
     }
 
-    // Notify scene to update weapon drop UI
-    this.scene?.updateWeaponPowerupUI?.();
+    // Notify scene to show weapon drop UI icon and start power-up state
+    if (this.scene?.showWeaponPowerup) {
+      this.scene.showWeaponPowerup({
+        iconKey: `drop_${dropId}`,
+        type: this.tempWeaponMaxShots ? "shots" : "time",
+        duration: durationMs ? Math.round(durationMs / 1000) : (this.tempWeaponMaxShots || 30)
+      });
+    } else {
+      this.scene?.updateWeaponPowerupUI?.();
+    }
   }
 
   /**
