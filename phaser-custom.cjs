@@ -45,7 +45,9 @@ var Phaser = {
 
     Input: {
         Keyboard: require('input/keyboard'),
-        Mouse: require('input/mouse')
+        Mouse: require('input/mouse'),
+        Pointer: require('input/Pointer'),
+        InputPlugin: require('input/InputPlugin')
     },
 
     GameObjects: {
