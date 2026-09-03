@@ -57,6 +57,7 @@ import shieldItemImg from "../assets/Sprites/sheld/itemskin-shield-000.png";
 import shieldSpriteImg from "../assets/Sprites/sheld/shield-animation 1-000.png";
 import ShieldPickup from "../entities/ShieldPickup";
 import playButton from "../assets/Sprites/playButton/btnstart-play-000.png";
+import HudFontHelper from "../utils/HudFontHelper";
 import slotFrameImg from "../assets/Sprites/powerup holder/slotframe-animation 1-000.png";
 import lightningIconImg from "../assets/Sprites/lightining power/itemskin-basehp-000.png";
 import beamImg from "../assets/Sprites/lightining power/beam_ends_spritesheet.png";
@@ -174,6 +175,7 @@ export default class GameScene extends Phaser.Scene {
 
   init(data) {
     this.selectedHeadKey = data?.selectedHeadKey || "player-head";
+    this.isGameOverTriggered = false;
   }
 
   create() {
@@ -875,6 +877,72 @@ export default class GameScene extends Phaser.Scene {
               popupSprites.forEach(s => s.destroy());
             }
           });
+        });
+      }
+    });
+  }
+
+  /**
+   * Triggers the animated Game Over sequence and restarts the scene.
+   */
+  showGameOver() {
+    if (this.isGameOverTriggered) return;
+    this.isGameOverTriggered = true;
+
+    // 1. Immediately pause physics world to freeze all velocity and collisions
+    this.physics.pause();
+
+    // 2. Pause enemy spawner timer event
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.paused = true;
+    }
+
+    // 3. Pause all active enemy animations and zero out velocities
+    if (Array.isArray(this.enemies)) {
+      this.enemies.forEach(enemy => {
+        if (enemy.sprite?.body) {
+          enemy.sprite.body.setVelocity(0, 0);
+        }
+        if (enemy.sprite?.anims) {
+          enemy.sprite.anims.pause();
+        }
+      });
+    }
+
+    // 4. Disable keyboard inputs
+    if (this.input?.keyboard) {
+      this.input.keyboard.enabled = false;
+    }
+
+    const centerX = this.cameras.main.width / 2;
+    const startY = -100;
+    const targetY = this.cameras.main.height / 2;
+
+    // Render "GAME OVER" centered using the existing hud-font spritesheet
+    const gameOverSprites = HudFontHelper.renderText(this, centerX, startY, "GAME OVER", {
+      scale: 0.5,
+      depth: 200000
+    });
+
+    // Fix position relative to visible camera viewport
+    gameOverSprites.forEach(sprite => {
+      sprite.setScrollFactor(0);
+    });
+
+    // Animate moving vertically downward from above the screen to the center
+    this.tweens.add({
+      targets: gameOverSprites,
+      y: targetY,
+      duration: 800,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        // WaitPad exactly 1 second after reaching middle, then restart scene
+        this.time.delayedCall(1000, () => {
+          try {
+            this.scene.restart();
+          } catch (err) {
+            console.error("CRITICAL ERROR RESTARTING SCENE:", err);
+          }
         });
       }
     });

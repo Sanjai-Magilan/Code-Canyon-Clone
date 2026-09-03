@@ -430,14 +430,18 @@ export default class Player {
     // Shake camera slightly
     this.scene?.cameras?.main?.shake(300, 0.02);
 
-    // Restart the scene after 1000ms delay using Phaser's Clock
-    this.scene?.time?.delayedCall(1000, () => {
-      try {
-        this.scene?.scene?.restart();
-      } catch (err) {
-        console.error("CRITICAL ERROR RESTARTING SCENE:", err);
-      }
-    });
+    // Trigger Game Over sequence in scene
+    if (typeof this.scene?.showGameOver === "function") {
+      this.scene.showGameOver();
+    } else {
+      this.scene?.time?.delayedCall(1000, () => {
+        try {
+          this.scene?.scene?.restart();
+        } catch (err) {
+          console.error("CRITICAL ERROR RESTARTING SCENE:", err);
+        }
+      });
+    }
   }
 
   /**
